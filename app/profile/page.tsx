@@ -57,11 +57,25 @@ export default function ProfilePage() {
     router.push("/login")
   }
 
+  const handleBack = () => {
+    try {
+      // If there is a history entry, go back. Otherwise navigate to /feed as a safe fallback.
+      if (typeof window !== "undefined" && window.history.length > 1) {
+        router.back()
+      } else {
+        router.push("/feed")
+      }
+    } catch (err) {
+      router.push("/feed")
+    }
+  }
+
   if (!user) return <div>Loading...</div>
 
   return (
     <div className="space-y-8">
       {/* Profile Header */}
+      
       <div className="bg-white rounded-xl border border-gray-200 p-8">
         <div className="flex items-start justify-between">
           <div className="flex gap-6">
@@ -79,6 +93,9 @@ export default function ProfilePage() {
           <div className="flex gap-2">
             <Button variant="outline" className="border-gray-300 bg-transparent">
               Edit Profile
+            </Button>
+            <Button variant="outline" onClick={handleBack} className="border-yellow-300 text-gray-700 ">
+              Kembali
             </Button>
             <Button
               onClick={handleLogout}

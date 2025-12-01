@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { formatDateTime } from "@/lib/formatDate"
 import { Button } from "@/components/ui/button"
 import VerificationModal from "@/components/officer/verification-modal"
 
@@ -55,14 +56,14 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition">
         <div className="p-6">
           {/* Header */}
-          <div className="flex items-start justify-between mb-6">
+            <div className="flex items-start justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold text-gray-900">{claim.postId ? claim.postId.itemName : "(Barang hilang atau dihapus)"}</h3>
               <p className={`text-xs font-semibold px-3 py-1 rounded-full w-fit mt-2 ${statusColor[claim.status]}`}>
                 {statusLabel[claim.status]}
               </p>
             </div>
-            <p className="text-sm text-gray-600">{new Date(claim.createdAt).toLocaleString("id-ID")}</p>
+            <p className="text-sm text-gray-600">{formatDateTime(claim.createdAt)}</p>
           </div>
 
           {/* Content Grid */}

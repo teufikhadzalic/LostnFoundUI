@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import CommentSection from "@/components/feed/comment-section"
+import { formatDateTime } from "@/lib/formatDate"
 
 interface Post {
   _id: string
@@ -147,7 +148,7 @@ export default function PostDetailDrawer({ post, onClose, onPostUpdated }: Props
                 </div>
                 <div className="p-3 bg-gray-50 rounded">
                   <p className="text-xs text-gray-600">Waktu</p>
-                  <p className="font-semibold">{new Date(post.createdAt).toLocaleString("id-ID")}</p>
+                  <p className="font-semibold">{formatDateTime(post.createdAt)}</p>
                 </div>
               </div>
 

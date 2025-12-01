@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
+import { formatDateTime } from "@/lib/formatDate"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 
@@ -153,7 +154,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-gray-900">{comment.userId.name}</p>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs text-gray-600">{new Date(comment.createdAt).toLocaleString("id-ID")}</p>
+                      <p className="text-xs text-gray-600">{formatDateTime(comment.createdAt)}</p>
                       {user?._id === comment.userId._id && (
                         <button
                           onClick={() => handleDeleteComment(comment._id)}

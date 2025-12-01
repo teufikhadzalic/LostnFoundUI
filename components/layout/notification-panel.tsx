@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { Spinner } from "@/components/ui/spinner"
 import PostDetailModal from "@/components/feed/post-detail-modal"
+import { formatDateTime } from "@/lib/formatDate"
 
 interface Notification {
   _id: string
@@ -183,14 +184,7 @@ export default function NotificationPanel() {
                     <p className={`text-sm ${!notification.read ? "font-semibold" : ""} text-gray-900`}>
                       {notification.message}
                     </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {new Date(notification.createdAt).toLocaleString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        day: "2-digit",
-                        month: "short",
-                      })}
-                    </p>
+                    <p className="text-xs text-gray-600 mt-1">{formatDateTime(notification.createdAt)}</p>
                   </div>
                   {!notification.read && <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0 mt-2"></div>}
                 </div>

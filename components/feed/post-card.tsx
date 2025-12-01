@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDateTime } from "@/lib/formatDate"
 interface Post {
   _id: string
   itemName: string
@@ -88,10 +89,9 @@ export default function PostCard({ post, onClick }: PostCardProps) {
               </div>
               <div>
                 <p className="font-semibold text-gray-900 text-sm">{post.userId.name}</p>
-                <p className="text-xs text-gray-600">{new Date(post.createdAt).toLocaleString("id-ID")}</p>
+                <p className="text-xs text-gray-600">{formatDateTime(post.createdAt)}</p>
               </div>
             </div>
-            <button className="text-gray-400 hover:text-gray-600">❤️</button>
           </div>
         </div>
       </div>

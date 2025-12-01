@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { formatDateTime } from "@/lib/formatDate"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -167,7 +168,7 @@ export default function ProfilePage() {
                   >
                     <div className="flex items-center justify-between ">
                       <p className="font-semibold text-gray-900">{post.itemName}</p>
-                      <p className="text-sm text-gray-600">{new Date(post.createdAt).toLocaleDateString("id-ID")}</p>
+                      <p className="text-sm text-gray-600">{formatDateTime(post.createdAt)}</p>
                     </div>
                   </div>
                 ))}

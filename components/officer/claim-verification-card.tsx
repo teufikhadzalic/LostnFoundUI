@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
 import { formatDateTime } from "@/lib/formatDate"
 import { Button } from "@/components/ui/button"
 import VerificationModal from "@/components/officer/verification-modal"
@@ -33,6 +35,9 @@ interface ClaimVerificationCardProps {
 export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerificationCardProps) {
   const [showModal, setShowModal] = useState(false)
   const [selectedAction, setSelectedAction] = useState<"approve" | "reject" | null>(null)
+  const [chatLoading, setChatLoading] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
 
   const handleAction = (action: "approve" | "reject") => {
     setSelectedAction(action)
@@ -126,23 +131,71 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
           </div>
 
           {/* Action Buttons */}
-          {claim.status === "pending" && (
-            <div className="flex gap-3">
-              <Button
-                onClick={() => handleAction("reject")}
-                variant="outline"
-                className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-              >
-                Tolak
-              </Button>
-              <Button
-                onClick={() => handleAction("approve")}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold"
-              >
-                Setujui
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-3">
+            {claim.status === "pending" ? (
+              <>
+                <Button
+                  onClick={() => handleAction("reject")}
+                  variant="outline"
+                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  Tolak
+                </Button>
+                <Button
+                  onClick={() => handleAction("approve")}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold"
+                >
+                  Setujui
+                </Button>
+              </>
+            ) : (
+              <div className="flex-1" />
+            )}
+
+            {/* Chat button available for officer to open/create conversation */}
+            <Button
+              onClick={async () => {
+                if (!claim._id) return
+                setChatLoading(true)
+                try {
+                  const token = localStorage.getItem("token")
+                  let res
+                  // Prefer post-level conversation if we have a post id
+                  if (claim.postId && claim.postId._id) {
+                    const claimerId = claim.userId?._id
+                    const q = claimerId ? `?claimer=${claimerId}` : ""
+                    res = await fetch(`/api/post/${claim.postId._id}${q}`, { headers: { Authorization: `Bearer ${token}` } })
+                  } else {
+                    res = await fetch(`/api/claim/${claim._id}`, { headers: { Authorization: `Bearer ${token}` } })
+                  }
+
+                  if (!res.ok) {
+                    // try to surface server error message
+                    let errBody = null
+                    try {
+                      errBody = await res.json()
+                    } catch (e) {
+                      /* ignore */
+                    }
+                    throw new Error(errBody?.error || res.statusText || "Gagal membuka chat")
+                  }
+
+                  const data = await res.json()
+                  const chatId = data._id || data._doc?._id || data.id
+                  if (!chatId) throw new Error("Chat id tidak ditemukan")
+                  router.push(`/officer/chat/${chatId}`)
+                } catch (e) {
+                  toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Gagal membuka chat" })
+                } finally {
+                  setChatLoading(false)
+                }
+              }}
+              disabled={chatLoading}
+              className="ml-auto bg-yellow-400 hover:bg-yellow-500 text-gray-900"
+            >
+              {chatLoading ? "Membuka..." : "Buka Chat"}
+            </Button>
+          </div>
         </div>
       </div>
 

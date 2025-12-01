@@ -100,7 +100,15 @@ export default function LoginForm() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Button variant="outline" type="button" className="border-gray-300 bg-transparent">
+        <Button
+          variant="outline"
+          type="button"
+          className="border-gray-300 bg-transparent"
+          onClick={() => {
+            // Start the SSO flow by redirecting to the backend SSO entrypoint
+            window.location.href = `${API_URL}/auth/sso`
+          }}
+        >
           SSO UI
         </Button>
         <Button variant="outline" type="button" className="border-gray-300 bg-transparent">

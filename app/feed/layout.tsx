@@ -41,7 +41,7 @@ export default function FeedLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Content Area */}
-        <main className="flex-1 overflow-auto pb-20 lg:pb-0 rounded-xl border border-gray-200 ">
+        <main className="flex-1 overflow-auto pb-20 lg:pb-0 ">
           <div className="max-w-4xl mx-auto px-6 py-8">{children}</div>
         </main>
       </div>

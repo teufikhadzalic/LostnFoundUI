@@ -3,6 +3,7 @@ import { authMiddleware } from "../middleware/auth.js"
 import Post from "../models/Post.js"
 import Notification from "../models/Notification.js"
 import logger from "../utils/logger.js"
+import * as geminiClient from "../utils/geminiClient.js"
 
 const router = express.Router()
 
@@ -27,14 +28,30 @@ router.post("/", authMiddleware, async (req, res) => {
     })
 
     await post.save()
+    // If Gemini is enabled, attempt to obtain and cache embedding for the new post
+    try {
+      const useGemini = (process.env.MATCH_USE_GEMINI || "false").toString().toLowerCase() === "true" && geminiClient.isGeminiAvailable()
+      if (useGemini) {
+        const emb = await geminiClient.embedText(`${post.itemName} \n ${post.description}`)
+        if (emb && emb.length) {
+          post.embedding = Array.from(emb)
+          await post.save()
+          logger.info(`Cached embedding for post ${post._id}`)
+        }
+      }
+    } catch (e) {
+      logger.warn(`Failed to cache embedding for new post ${post._id}: ${e.message}`)
+    }
     logger.info(`Post created successfully: ${post._id}`)
     // After creating a post, run a lightweight matching routine to find possible matches
     // between lost and found posts. This is a simple heuristic-based matcher (no external AI).
     ;(async function runMatching(newPost) {
       try {
-  logger.info(`Running matcher for post ${newPost._id} - "${newPost.itemName}" (type=${newPost.type})`)
-  const includeSelf = (process.env.MATCH_INCLUDE_SELF || "false").toString().toLowerCase() === "true"
-  logger.info(`Matcher includeSelf=${includeSelf}`)
+    logger.info(`Running matcher for post ${newPost._id} - "${newPost.itemName}" (type=${newPost.type})`)
+    const includeSelf = (process.env.MATCH_INCLUDE_SELF || "false").toString().toLowerCase() === "true"
+    logger.info(`Matcher includeSelf=${includeSelf}`)
+    const useGemini = (process.env.MATCH_USE_GEMINI || "false").toString().toLowerCase() === "true" && geminiClient.isGeminiAvailable()
+    if (useGemini) logger.info("Matcher: GEMINI semantic embeddings enabled")
         // helper: normalize and tokenise text
         const normalize = (s = "") =>
           s
@@ -68,6 +85,18 @@ router.post("/", authMiddleware, async (req, res) => {
 
         const matches = []
 
+        // If Gemini allowed, request embedding for the new post once
+        let newEmb = null
+        if (useGemini) {
+          try {
+            newEmb = await geminiClient.embedText(`${newPost.itemName} \n ${newPost.description}`)
+            if (newEmb) logger.info(`Matcher: obtained embedding for new post (${newPost._id}) len=${newEmb.length}`)
+          } catch (e) {
+            logger.warn(`Matcher: failed to get embedding for new post ${newPost._id}: ${e.message}`)
+            newEmb = null
+          }
+        }
+
         for (const cand of candidates) {
           // skip same user unless configured to include self-matches
           if (!includeSelf) {
@@ -91,17 +120,48 @@ router.post("/", authMiddleware, async (req, res) => {
           const descSim = jaccard(newDescTokens, candDescTokens)
 
           // small boost if category or location matches
-          let score = Math.max(nameSim, descSim) // primary
-          if (cand.category === newPost.category) score += 0.15
-          if (cand.location && newPost.location && cand.location.toLowerCase() === newPost.location.toLowerCase()) score += 0.1
+          let heuristicScore = Math.max(nameSim, descSim) // primary
+          if (cand.category === newPost.category) heuristicScore += 0.15
+          if (cand.location && newPost.location && cand.location.toLowerCase() === newPost.location.toLowerCase()) heuristicScore += 0.1
+          heuristicScore = Math.min(heuristicScore, 1)
 
-          // cap score
-          score = Math.min(score, 1)
+          // Try semantic embedding similarity when available
+          let embeddingScore = null
+          if (newEmb) {
+            try {
+              const candEmb = await geminiClient.embedText(`${cand.itemName} \n ${cand.description}`)
+                  if (candEmb && candEmb.length === newEmb.length) {
+                    embeddingScore = geminiClient.cosineSimilarity(newEmb, candEmb)
+                    logger.info(`Matcher embedding sim: cand=${cand._id} embSim=${embeddingScore.toFixed(3)}`)
+                    // cache candidate embedding if not present
+                    try {
+                      if (!cand.embedding || cand.embedding.length !== candEmb.length) {
+                        cand.embedding = Array.from(candEmb)
+                        await cand.save()
+                        logger.info(`Cached embedding for candidate ${cand._id}`)
+                      }
+                    } catch (saveErr) {
+                      logger.warn(`Failed to cache embedding for candidate ${cand._id}: ${saveErr.message}`)
+                    }
+                  } else if (candEmb) {
+                    logger.warn(`Matcher: embedding length mismatch for cand ${cand._id}`)
+                  }
+            } catch (e) {
+              logger.warn(`Matcher: failed to get embedding for candidate ${cand._id}: ${e.message}`)
+            }
+          }
 
-          // threshold — tune as needed (temporarily lowered to help testing)
-          const threshold = 0.25
-          logger.info(`Matcher compare: cand=${cand._id} nameSim=${nameSim.toFixed(2)} descSim=${descSim.toFixed(2)} boostedScore=${score.toFixed(2)}`)
-          if (score >= threshold) {
+          // Final score: if embedding available, prefer it (weighted) otherwise heuristic
+          // Weighting: embedding 0.8, heuristic 0.2
+          let score = heuristicScore
+          if (embeddingScore !== null) {
+            score = Math.max(heuristicScore, embeddingScore * 0.95) // keep a conservative mapping: favor embedding but preserve heuristic bumps
+          }
+
+          // threshold — prefer higher threshold for embeddings
+          const defaultThreshold = embeddingScore !== null ? parseFloat(process.env.MATCH_SIMILARITY_THRESHOLD || "0.75") : parseFloat(process.env.MATCH_SIMILARITY_THRESHOLD || "0.25")
+          logger.info(`Matcher compare: cand=${cand._id} nameSim=${nameSim.toFixed(2)} descSim=${descSim.toFixed(2)} heuristic=${heuristicScore.toFixed(2)} finalScore=${score.toFixed(2)} threshold=${defaultThreshold}`)
+          if (score >= defaultThreshold) {
             matches.push({ cand, score })
           }
         }

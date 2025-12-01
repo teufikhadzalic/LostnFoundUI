@@ -54,12 +54,13 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
       const user = localStorage.getItem("user")
       if (user) {
         const parsed = JSON.parse(user)
-        setIsOwner(parsed.id === post.userId._id || parsed.id === post.userId)
+        const postOwnerId = post?.userId?._id ?? post?.userId
+        setIsOwner(parsed.id === postOwnerId)
       }
     } catch (e) {
       setIsOwner(false)
     }
-  }, [post.userId])
+  }, [post])
 
   useEffect(() => {
     // trigger entrance animation
@@ -200,13 +201,22 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
             <div className="border-t border-gray-200 pt-6 pb-6">
               <p className="text-sm text-gray-600 mb-3">Dilaporkan oleh</p>
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white font-bold">
-                  {post.userId.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">{post.userId.name}</p>
-                  <p className="text-sm text-gray-600">{post.userId._id}</p>
-                </div>
+                {(() => {
+                  const reporterName = post?.userId?.name ?? "Unknown User"
+                  const reporterInitial = reporterName && typeof reporterName === "string" && reporterName.length > 0 ? reporterName.charAt(0).toUpperCase() : "?"
+                  const reporterId = post?.userId?._id ?? ""
+                  return (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white font-bold">
+                        {reporterInitial}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">{reporterName}</p>
+                        <p className="text-sm text-gray-600">{reporterId}</p>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </div>
 

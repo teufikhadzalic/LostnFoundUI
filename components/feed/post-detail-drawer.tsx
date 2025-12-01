@@ -33,6 +33,8 @@ interface Props {
 export default function PostDetailDrawer({ post, onClose, onPostUpdated }: Props) {
   const [isOwner, setIsOwner] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [matching, setMatching] = useState(false)
+  const [matchMode, setMatchMode] = useState<"unknown" | "ai" | "heuristic">("unknown")
   const [isClosing, setIsClosing] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const { toast } = useToast()
@@ -82,6 +84,20 @@ export default function PostDetailDrawer({ post, onClose, onPostUpdated }: Props
   useEffect(() => {
     // when post becomes available, mark mounted to allow entrance animation
     if (post) {
+      // fetch server-side matching mode (AI enabled or heuristic)
+      ;(async () => {
+        try {
+          const modeRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/match/mode`)
+          if (modeRes && modeRes.ok) {
+            const md = await modeRes.json()
+            setMatchMode(md?.mode === "ai" ? "ai" : "heuristic")
+          } else {
+            setMatchMode("heuristic")
+          }
+        } catch (e) {
+          setMatchMode("heuristic")
+        }
+      })()
       // allow the transform to start from off-screen then animate in
       const t = window.setTimeout(() => setIsMounted(true), 10)
       return () => window.clearTimeout(t)
@@ -172,6 +188,45 @@ export default function PostDetailDrawer({ post, onClose, onPostUpdated }: Props
                   </Button>
                 </div>
               )}
+
+              <div className="mt-4">
+                <div className="mb-2 text-xs text-gray-600">Mode matching: <span className={`font-semibold ${matchMode === "ai" ? "text-green-600" : "text-gray-600"}`}>{matchMode === "ai" ? "AI" : "Heuristic"}</span></div>
+                <button
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded bg-indigo-600 text-white"
+                  onClick={async () => {
+                    if (!post) return
+                    setMatching(true)
+                    try {
+                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/match/post/${post._id}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+                      })
+                      const data = await res.json()
+                      if (!res.ok) throw new Error(data.error || "Gagal melakukan matching")
+                      const heuristicCount = Array.isArray(data.heuristicMatches) ? data.heuristicMatches.length : 0
+                      const aiCount = Array.isArray(data.aiMatches) ? data.aiMatches.length : 0
+                      const total = data.matched ?? (heuristicCount + aiCount)
+                      const modeText = data?.mode || (matchMode === "ai" ? "AI" : "Heuristic")
+                      toast({ title: "Matching selesai", description: `Mode: ${modeText} — Heuristic: ${heuristicCount}, AI: ${aiCount}, Total: ${total}` })
+                      console.log("Match details:", data)
+                    } catch (err) {
+                      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal melakukan matching" })
+                    } finally {
+                      setMatching(false)
+                    }
+                  }}
+                  disabled={matching}
+                >
+                  {matching ? (
+                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    "Cek Kecocokan"
+                  )}
+                </button>
+              </div>
 
               <div className="mt-6">
                 <CommentSection postId={post._id} />

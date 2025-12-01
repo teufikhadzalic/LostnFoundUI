@@ -65,9 +65,9 @@ export default function FeedPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (filters.faculty) params.append("faculty", filters.faculty)
-      if (filters.category) params.append("category", filters.category)
-      if (filters.type) params.append("type", filters.type)
+      if (filters.faculty && filters.faculty !== "all") params.append("faculty", filters.faculty)
+      if (filters.category && filters.category !== "all") params.append("category", filters.category)
+      if (filters.type && filters.type !== "all") params.append("type", filters.type)
       if (filters.search) params.append("search", filters.search)
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts?${params}`, {
@@ -95,7 +95,7 @@ export default function FeedPage() {
   }
 
   return (
-    <div className="space-y-6 border-gray-200 ">
+    <div className="space-y-6 sticky-border">
       {/* Header with Create Button */}
       <div className="flex items-center justify-between sticky top-0 bg-gray-50 pt-6 pb-4 z-10 bor">
         <h1 className="text-3xl font-bold text-gray-900">Timeline Lost & Found</h1>

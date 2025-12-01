@@ -33,6 +33,7 @@ export default function ClientLayout({ children }: Props) {
           <div className="py-8">{children}</div>
         </div>
       </main>
+  {/* global chat widget removed */}
     </div>
   )
 }

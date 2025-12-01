@@ -16,6 +16,8 @@ const postSchema = new mongoose.Schema({
   status: { type: String, enum: ["active", "claimed", "resolved"], default: "active" },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  // Optional cached semantic embedding to speed up matching and reduce external calls
+  embedding: { type: [Number], default: undefined },
 })
 
 export default mongoose.model("Post", postSchema)

@@ -29,6 +29,8 @@ const userSchema = new Schema({
   },
   role: { type: String, enum: ["student", "officer"], default: "student" },
   profileImage: { type: String },
+  // Optional personal email for receiving notifications (distinct from institutional SSO email)
+  notificationEmail: { type: String, trim: true, sparse: true },
   username: {
     type: String,
     unique: true,

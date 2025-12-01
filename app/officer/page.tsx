@@ -91,7 +91,7 @@ export default function OfficerPage() {
       setLoading(true)
       const token = localStorage.getItem("token")
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/officer/pending-claims`,
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/officer/claims`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },

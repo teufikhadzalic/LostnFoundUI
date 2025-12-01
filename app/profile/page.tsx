@@ -16,6 +16,10 @@ interface Post {
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [editNotificationEmail, setEditNotificationEmail] = useState("")
   const [posts, setPosts] = useState<Post[]>([])
   const [selectedPost, setSelectedPost] = useState<any | null>(null)
   const [postLoading, setPostLoading] = useState(false)
@@ -32,6 +36,9 @@ export default function ProfilePage() {
 
     const parsedUser = JSON.parse(userData)
     setUser(parsedUser)
+    setEditName(parsedUser.name || "")
+    setEditEmail(parsedUser.email || "")
+    setEditNotificationEmail(parsedUser.notificationEmail || "")
     fetchUserPosts(parsedUser.id)
   }, [router])
 
@@ -87,6 +94,42 @@ export default function ProfilePage() {
     router.push("/login")
   }
 
+  const handleEditToggle = () => {
+    setEditing((s) => !s)
+  }
+
+  const handleSaveProfile = async () => {
+    try {
+      const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "")
+      const token = localStorage.getItem("token")
+      const res = await fetch(`${API_BASE}/api/users/${user.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ name: editName, email: editEmail, notificationEmail: editNotificationEmail }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Gagal menyimpan profil")
+      }
+
+      const updated = await res.json()
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ id: updated._id, email: updated.email, name: updated.name, role: updated.role, notificationEmail: updated.notificationEmail || "" }),
+      )
+      setUser({ id: updated._id, email: updated.email, name: updated.name, role: updated.role, notificationEmail: updated.notificationEmail || "" })
+      setEditing(false)
+      toast({ title: "Profil diperbarui", description: "Perubahan tersimpan" })
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal menyimpan" })
+    }
+  }
+
   const handleBack = () => {
     try {
       // If there is a history entry, go back. Otherwise navigate to /feed as a safe fallback.
@@ -121,17 +164,59 @@ export default function ProfilePage() {
                 {user.name?.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
-                <p className="text-gray-600 mt-1">{user.email}</p>
-                <p className="text-sm text-gray-600 mt-2">
-                  {user.role === "officer" ? "👮 Officer/Petugas" : "👤 Mahasiswa"}
-                </p>
+                {!editing ? (
+                  <>
+                    <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
+                    <p className="text-gray-600 mt-1">{user.email}</p>
+                    <p className="text-sm text-gray-600 mt-2">{user.role === "officer" ? "👮 Officer/Petugas" : "👤 Mahasiswa"}</p>
+                  </>
+                  ) : (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Nama</label>
+                      <input
+                        className="mt-1 block w-full rounded-md border-gray-200"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Email</label>
+                      <input
+                        className="mt-1 block w-full rounded-md border-gray-200"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Email Notifikasi (pribadi)</label>
+                      <input
+                        className="mt-1 block w-full rounded-md border-gray-200"
+                        value={editNotificationEmail}
+                        onChange={(e) => setEditNotificationEmail(e.target.value)}
+                        placeholder="contoh: saya@gmail.com"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Email ini akan digunakan untuk menerima notifikasi via email.</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="border-gray-300 bg-transparent">
-                Edit Profile
-              </Button>
+              {!editing ? (
+                <Button variant="outline" className="border-gray-300 bg-transparent" onClick={handleEditToggle}>
+                  Edit Profile
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={handleSaveProfile} className="bg-green-500 text-white">
+                    Save
+                  </Button>
+                  <Button variant="outline" onClick={handleEditToggle} className="border-gray-300 bg-transparent">
+                    Cancel
+                  </Button>
+                </>
+              )}
               <Button
                 onClick={handleLogout}
                 variant="outline"
@@ -142,6 +227,11 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+          <div className="p-4 border-t">
+            {!editing && (
+              <p className="text-sm text-gray-600">Email notifikasi: {user.notificationEmail || "(belum diatur)"}</p>
+            )}
+          </div>
       </div>
 
       {/* Recent Posts + Drawer (two-column layout) */}

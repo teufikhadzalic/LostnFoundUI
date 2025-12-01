@@ -3,14 +3,26 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
 
 interface SidebarProps {
-  user: any
+  user?: any
 }
 
-export default function Sidebar({ user }: SidebarProps) {
+export default function Sidebar({ user: propUser }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const [user, setUser] = useState<any>(propUser || null)
+
+  useEffect(() => {
+    if (propUser) return
+    try {
+      const raw = localStorage.getItem("user")
+      if (raw) setUser(JSON.parse(raw))
+    } catch (e) {
+      setUser(null)
+    }
+  }, [propUser])
 
   const navItems = [
     { href: "/feed", label: "Feed", icon: "🏠" },

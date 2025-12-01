@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import CommentSection from "@/components/feed/comment-section"
@@ -30,10 +30,45 @@ interface PostDetailModalProps {
 }
 
 export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDetailModalProps) {
+  const formatDateTime = (iso?: string) => {
+    if (!iso) return ""
+    const d = new Date(iso)
+    const dateStr = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+    const hh = String(d.getHours()).padStart(2, "0")
+    const mm = String(d.getMinutes()).padStart(2, "0")
+    const ss = String(d.getSeconds()).padStart(2, "0")
+    return `${dateStr} ${hh}:${mm}:${ss}`
+  }
+
   const [showClaimForm, setShowClaimForm] = useState(false)
   const [claimReason, setClaimReason] = useState("")
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
+  const [isOwner, setIsOwner] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    try {
+      const user = localStorage.getItem("user")
+      if (user) {
+        const parsed = JSON.parse(user)
+        setIsOwner(parsed.id === post.userId._id || parsed.id === post.userId)
+      }
+    } catch (e) {
+      setIsOwner(false)
+    }
+  }, [post.userId])
+
+  useEffect(() => {
+    // trigger entrance animation
+    const t = window.setTimeout(() => setIsMounted(true), 10)
+    return () => {
+      window.clearTimeout(t)
+      setIsMounted(false)
+    }
+  }, [])
 
   const handleClaim = async () => {
     if (!claimReason.trim()) {
@@ -47,7 +82,6 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
 
     setLoading(true)
     try {
-      // In a real app, you'd upload photos here
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/claims`, {
         method: "POST",
         headers: {
@@ -85,12 +119,29 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
     }
   }
 
+  const handleClose = () => {
+    // play close animation then call parent's onClose
+    setIsClosing(true)
+    setIsMounted(false)
+    window.setTimeout(() => {
+      onClose()
+    }, 220)
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Close Button */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-end">
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
+    <div
+      className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-opacity duration-200 ${
+        isClosing ? "opacity-0" : isMounted ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      <div
+        className={`bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-200 ${
+          isClosing ? "opacity-0 scale-95" : isMounted ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        }`}
+      >
+        {/* Close Button (sticky & on top) */}
+        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 p-4 flex justify-end">
+          <button onClick={handleClose} className="text-gray-500 hover:text-gray-700 text-xl">
             ✕
           </button>
         </div>
@@ -107,8 +158,7 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
               <span
                 className={`text-xs font-semibold px-3 py-1 rounded-full ${
                   post.type === "lost" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                }`}
-              >
+                }`}>
                 {post.type === "lost" ? "Barang Hilang" : "Barang Ditemukan"}
               </span>
               <span
@@ -116,10 +166,9 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
                   post.status === "resolved"
                     ? "bg-green-100 text-green-700"
                     : post.status === "claimed"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-yellow-100 text-yellow-700"
-                }`}
-              >
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-yellow-100 text-yellow-700"
+                }`}>
                 {post.status === "resolved" ? "Selesai" : post.status === "claimed" ? "Diklaim" : "Aktif"}
               </span>
             </div>
@@ -143,7 +192,7 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600 mb-1">Waktu</p>
-                <p className="font-semibold text-gray-900">{new Date(post.createdAt).toLocaleString("id-ID")}</p>
+                <p className="font-semibold text-gray-900">{formatDateTime(post.createdAt)}</p>
               </div>
             </div>
 
@@ -187,23 +236,51 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
                       Note: Officer akan meminta foto Anda dengan barang dan foto NPM untuk verifikasi
                     </p>
                     <div className="flex gap-3">
-                      <Button
-                        onClick={() => setShowClaimForm(false)}
-                        variant="outline"
-                        className="flex-1 border-gray-300"
-                      >
+                      <Button onClick={() => setShowClaimForm(false)} variant="outline" className="flex-1 border-gray-300">
                         Batal
                       </Button>
-                      <Button
-                        onClick={handleClaim}
-                        disabled={loading}
-                        className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold"
-                      >
+                      <Button onClick={handleClaim} disabled={loading} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold">
                         {loading ? "Memproses..." : "Kirim Klaim"}
                       </Button>
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Owner actions */}
+            {isOwner && (
+              <div className="mt-4 flex gap-3">
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    const ok = confirm("Yakin ingin menghapus posting ini? Tindakan ini tidak dapat dibatalkan.")
+                    if (!ok) return
+                    setDeleting(true)
+                    try {
+                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${post._id}`, {
+                        method: "DELETE",
+                        headers: {
+                          Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        },
+                      })
+                      if (!res.ok) throw new Error("Gagal menghapus post")
+
+                      toast({ title: "Berhasil", description: "Posting berhasil dihapus" })
+                      onPostUpdated()
+                      // animate close then signal parent
+                      handleClose()
+                    } catch (err) {
+                      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal menghapus post" })
+                    } finally {
+                      setDeleting(false)
+                    }
+                  }}
+                  disabled={deleting}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                >
+                  {deleting ? "Menghapus..." : "Hapus Post"}
+                </Button>
               </div>
             )}
           </div>

@@ -36,7 +36,7 @@ export default function PostCard({ post, onClick }: PostCardProps) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition cursor-pointer"
+      className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md active:scale-[0.99] transition-all duration-200 cursor-pointer"
     >
       <div className="grid md:grid-cols-3 gap-6 p-6">
         {/* Image */}

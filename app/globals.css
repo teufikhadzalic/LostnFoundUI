@@ -117,6 +117,10 @@
 }
 
 @layer base {
+  html {
+    /* Reserve space for the scrollbar to avoid layout jumps when it appears/disappears */
+    scrollbar-gutter: stable;
+  }
   * {
     @apply border-border outline-ring/50;
   }

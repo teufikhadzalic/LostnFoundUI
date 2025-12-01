@@ -60,4 +60,19 @@ router.get("/:postId", async (req, res) => {
   }
 })
 
+// GET claim by id (detail) — returns claim with populated post info
+router.get("/detail/:claimId", async (req, res) => {
+  try {
+    const claim = await Claim.findById(req.params.claimId).populate({ path: "postId", select: "itemName description category faculty location image type status createdAt userId" })
+    if (!claim) {
+      logger.warn(`GET /api/claims/detail/:claimId — claim not found: ${req.params.claimId}`)
+      return res.status(404).json({ error: "Claim not found" })
+    }
+    res.json(claim)
+  } catch (err) {
+    logger.error(`Error in GET /api/claims/detail/:claimId — ${err.message}`)
+    res.status(500).json({ error: "Failed to fetch claim detail" })
+  }
+})
+
 export default router

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { Spinner } from "@/components/ui/spinner"
+import PostDetailModal from "@/components/feed/post-detail-modal"
 
 interface Notification {
   _id: string
@@ -11,11 +13,15 @@ interface Notification {
   createdAt: string
   postId?: string
   claimId?: string
+  // optional embedded post payload — when available the UI will open modal without an extra fetch
+  post?: any
 }
 
 export default function NotificationPanel() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedPost, setSelectedPost] = useState<any | null>(null)
+  const [postLoading, setPostLoading] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -60,6 +66,57 @@ export default function NotificationPanel() {
     }
   }
 
+  const openNotification = async (notification: Notification) => {
+    // mark as read locally & server
+  markAsRead(notification._id)
+
+    // If notification already includes post payload, use it (fast path)
+    if (notification.post) {
+      setSelectedPost(notification.post)
+      return
+    }
+
+    // if notification references a postId, fetch it and open modal
+    if (notification.postId) {
+      try {
+  setPostLoading(true)
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${notification.postId}`)
+        if (!res.ok) throw new Error("Gagal memuat posting")
+        const data = await res.json()
+        setSelectedPost(data)
+      } catch (err) {
+        toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal memuat posting" })
+      } finally {
+        setPostLoading(false)
+      }
+      return
+    }
+
+    // If notification references a claimId, fetch claim detail and open related post
+    if (notification.claimId) {
+      try {
+        setPostLoading(true)
+        const resClaim = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/claims/detail/${notification.claimId}`)
+        if (!resClaim.ok) throw new Error("Gagal memuat klaim")
+        const claim = await resClaim.json()
+        if (claim.postId) {
+          // claim.postId is populated by backend
+          setSelectedPost(claim.postId)
+        } else {
+          toast({ title: "Notifikasi", description: notification.message })
+        }
+      } catch (err) {
+        toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal memuat klaim" })
+      } finally {
+        setPostLoading(false)
+      }
+      return
+    }
+
+    // fallback: just show message
+    toast({ title: "Notifikasi", description: notification.message })
+  }
+
   const getNotificationColor = (type: string) => {
     switch (type) {
       case "claim_approved":
@@ -70,6 +127,8 @@ export default function NotificationPanel() {
         return "border-l-4 border-l-blue-500 bg-blue-50"
       case "new_comment":
         return "border-l-4 border-l-yellow-500 bg-yellow-50"
+      case "match_found":
+        return "border-l-4 border-l-indigo-500 bg-indigo-50"
       default:
         return "border-l-4 border-l-gray-500 bg-gray-50"
     }
@@ -113,10 +172,10 @@ export default function NotificationPanel() {
             {notifications.map((notification) => (
               <div
                 key={notification._id}
-                className={`border-b border-gray-100 p-4 cursor-pointer hover:bg-gray-50 transition ${getNotificationColor(
+                className={`border-b border-gray-100 p-4 cursor-pointer hover:bg-gray-100 active:scale-[0.99] transition-all duration-200 ${getNotificationColor(
                   notification.type,
                 )}`}
-                onClick={() => markAsRead(notification._id)}
+                onClick={() => openNotification(notification)}
               >
                 <div className="flex gap-3">
                   <div className="text-lg flex-shrink-0 mt-0.5">{getNotificationIcon(notification.type)}</div>
@@ -147,6 +206,10 @@ export default function NotificationPanel() {
           Refresh
         </button>
       </div>
+
+      {selectedPost && (
+        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} onPostUpdated={() => { fetchNotifications(); setSelectedPost(null) }} />
+      )}
     </div>
   )
 }

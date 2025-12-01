@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Sidebar from "@/components/layout/sidebar"
+// Sidebar is mounted centrally in the root layout; do not render it here to avoid duplication
 
 export default function OfficerLayout({
   children,
@@ -41,25 +41,10 @@ export default function OfficerLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div className="hidden lg:block w-64 border-r border-gray-200 bg-white overflow-y-auto">
-        <Sidebar user={user} />
-      </div>
+      {/* Sidebar is provided by RootLayout (fixed). */}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-yellow-400 rounded flex items-center justify-center font-bold text-sm text-gray-900">
-              UI
-            </div>
-            <span className="font-bold text-gray-900">LostnFound - Officer Panel</span>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white text-sm font-bold">
-            {user?.name?.charAt(0).toUpperCase()}
-          </div>
-        </header>
 
         {/* Content Area */}
         <main className="flex-1 overflow-auto">

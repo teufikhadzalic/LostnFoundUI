@@ -95,9 +95,9 @@ export default function FeedPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 border-gray-200 ">
       {/* Header with Create Button */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between sticky top-0 bg-gray-50 pt-6 pb-4 z-10 bor">
         <h1 className="text-3xl font-bold text-gray-900">Timeline Lost & Found</h1>
         <Button
           onClick={() => setShowCreateModal(true)}

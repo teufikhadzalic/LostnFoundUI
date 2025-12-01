@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import PostDetailModal from "@/components/feed/post-detail-modal"
+import PostDetailDrawer from "@/components/feed/post-detail-drawer"
 
 interface Post {
   _id: string
@@ -14,6 +16,8 @@ interface Post {
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null)
   const [posts, setPosts] = useState<Post[]>([])
+  const [selectedPost, setSelectedPost] = useState<any | null>(null)
+  const [postLoading, setPostLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
@@ -51,6 +55,31 @@ export default function ProfilePage() {
     }
   }
 
+  const openPostDetail = async (postId: string) => {
+    try {
+      setPostLoading(true)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${postId}`)
+      if (!res.ok) throw new Error("Failed to fetch post detail")
+      const data = await res.json()
+      setSelectedPost(data)
+    } catch (err) {
+      console.error("Failed to load post detail", err)
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal memuat detail" })
+    } finally {
+      setPostLoading(false)
+    }
+  }
+
+  const handlePostUpdated = () => {
+    // refresh list and close modal
+    const parsed = localStorage.getItem("user")
+    try {
+      const id = parsed ? JSON.parse(parsed).id : null
+      if (id) fetchUserPosts(id)
+    } catch (e) {}
+    setSelectedPost(null)
+  }
+
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("user")
@@ -76,57 +105,87 @@ export default function ProfilePage() {
     <div className="space-y-8">
       {/* Profile Header */}
       
-      <div className="bg-white rounded-xl border border-gray-200 p-8">
-        <div className="flex items-start justify-between">
-          <div className="flex gap-6">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white text-4xl font-bold">
-              {user.name?.charAt(0).toUpperCase()}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-4 p-4 border-b bg-gray-50/50">
+          <Button variant="outline" onClick={handleBack} className="p-2 w-10 h-10 flex items-center justify-center" aria-label="Kembali">
+            <span className="text-lg">←</span>
+          </Button>
+          <h1 className="text-lg font-semibold">Profil Saya</h1>
+        </div>
+
+        <div className="p-8">
+          <div className="flex items-start justify-between">
+            <div className="flex gap-6">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white text-4xl font-bold">
+                {user.name?.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
+                <p className="text-gray-600 mt-1">{user.email}</p>
+                <p className="text-sm text-gray-600 mt-2">
+                  {user.role === "officer" ? "👮 Officer/Petugas" : "👤 Mahasiswa"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{user.name}</h1>
-              <p className="text-gray-600 mt-1">{user.email}</p>
-              <p className="text-sm text-gray-600 mt-2">
-                {user.role === "officer" ? "👮 Officer/Petugas" : "👤 Mahasiswa"}
-              </p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="border-gray-300 bg-transparent">
+                Edit Profile
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
+              >
+                Logout
+              </Button>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="border-gray-300 bg-transparent">
-              Edit Profile
-            </Button>
-            <Button variant="outline" onClick={handleBack} className="border-yellow-300 text-gray-700 ">
-              Kembali
-            </Button>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
-            >
-              Logout
-            </Button>
           </div>
         </div>
       </div>
 
-      {/* Recent Posts */}
+      {/* Recent Posts + Drawer (two-column layout) */}
       <div className="bg-white rounded-xl border border-gray-200 p-8">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Post Terbaru Anda</h2>
-        {loading ? (
-          <div>Loading...</div>
-        ) : posts.length === 0 ? (
-          <p className="text-gray-600">Anda belum membuat post</p>
-        ) : (
-          <div className="space-y-3">
-            {posts.map((post) => (
-              <div key={post._id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-gray-900">{post.itemName}</p>
-                  <p className="text-sm text-gray-600">{new Date(post.createdAt).toLocaleDateString("id-ID")}</p>
-                </div>
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1">
+            {loading ? (
+              <div>Loading...</div>
+            ) : posts.length === 0 ? (
+              <p className="text-gray-600">Anda belum membuat post</p>
+            ) : (
+              <div className="space-y-3">
+                {posts.map((post) => (
+                  <div
+                    key={post._id}
+                    className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer"
+                    onClick={() => openPostDetail(post._id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") openPostDetail(post._id)
+                    }}
+                  >
+                    <div className="flex items-center justify-between ">
+                      <p className="font-semibold text-gray-900">{post.itemName}</p>
+                      <p className="text-sm text-gray-600">{new Date(post.createdAt).toLocaleDateString("id-ID")}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
+
+          {/* Drawer column (desktop/tablet) */}
+          <div className={`hidden md:block md:relative transition-all overflow-hidden ${selectedPost ? "md:w-96 lg:w-1/3" : "md:w-0" } min-h-[56vh] md:min-h-[64vh]`}>
+            <PostDetailDrawer post={selectedPost} onClose={() => setSelectedPost(null)} onPostUpdated={handlePostUpdated} />
+          </div>
+          {/* Mobile: use the modal for full-screen UX */}
+          {selectedPost && (
+            <div className="md:hidden">
+              <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} onPostUpdated={handlePostUpdated} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

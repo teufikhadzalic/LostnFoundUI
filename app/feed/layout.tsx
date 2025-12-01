@@ -37,40 +37,13 @@ export default function FeedLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar - Desktop */}
-      <div className="hidden lg:block w-64 border-r border-gray-200 bg-white overflow-y-auto">
-        <Sidebar user={user} />
-      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-yellow-400 rounded flex items-center justify-center font-bold text-sm text-gray-900">
-              UI
-            </div>
-            <span className="font-bold text-gray-900">LostnFound</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <a href="/notifications" className="text-gray-600 hover:text-gray-900 text-lg">
-              🔔
-            </a>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white text-sm font-bold">
-              {user?.name?.charAt(0).toUpperCase()}
-            </div>
-          </div>
-        </header>
-
         {/* Content Area */}
-        <main className="flex-1 overflow-auto pb-20 lg:pb-0">
+        <main className="flex-1 overflow-auto pb-20 lg:pb-0 rounded-xl border border-gray-200 ">
           <div className="max-w-4xl mx-auto px-6 py-8">{children}</div>
         </main>
-      </div>
-
-      {/* Notification Panel - Desktop */}
-      <div className="hidden lg:flex flex-col w-80 border-l border-gray-200 bg-white overflow-hidden">
-        <NotificationPanel />
       </div>
 
       {/* Mobile Bottom Navigation */}

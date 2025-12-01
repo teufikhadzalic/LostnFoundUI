@@ -10,7 +10,7 @@ interface Claim {
     _id: string
     itemName: string
     image: string
-  }
+  } | null
   userId: {
     _id: string
     name: string
@@ -57,7 +57,7 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
           {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-xl font-bold text-gray-900">{claim.postId.itemName}</h3>
+              <h3 className="text-xl font-bold text-gray-900">{claim.postId ? claim.postId.itemName : "(Barang hilang atau dihapus)"}</h3>
               <p className={`text-xs font-semibold px-3 py-1 rounded-full w-fit mt-2 ${statusColor[claim.status]}`}>
                 {statusLabel[claim.status]}
               </p>
@@ -72,8 +72,8 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
               <p className="text-sm font-semibold text-gray-900 mb-3">Foto Barang</p>
               <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
                 <img
-                  src={claim.postId.image || "/placeholder.svg"}
-                  alt={claim.postId.itemName}
+                  src={(claim.postId && claim.postId.image) || "/placeholder.svg"}
+                  alt={(claim.postId && claim.postId.itemName) || "Foto barang"}
                   className="w-full h-full object-cover"
                 />
               </div>

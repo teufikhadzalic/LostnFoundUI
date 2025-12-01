@@ -9,10 +9,14 @@ const router = express.Router()
 
 router.get("/pending-claims", authMiddleware, officerMiddleware, async (req, res) => {
   try {
-    const claims = await Claim.find({ status: "pending" })
+    let claims = await Claim.find({ status: "pending" })
       .populate("userId", "name npm profileImage")
       .populate("postId", "itemName image")
       .sort({ createdAt: -1 })
+
+    // Remove claims that reference a deleted post (postId === null)
+    claims = claims.filter((c) => c.postId)
+
     res.json(claims)
   } catch (err) {
     logger.error(`Error in GET /api/officer/pending-claims — ${err.message}`)

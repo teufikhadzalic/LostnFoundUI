@@ -34,7 +34,7 @@ router.post("/register", async (req, res, next) => {
     await user.save()
     console.log("  saved user password field:", user.password)
 
-    const token = createToken(user._id)
+  const token = createToken(user._id, user.role)
     logger.info(`User registered successfully: ${email}`)
 
     return res.status(201).json({
@@ -76,7 +76,7 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" })
     }
 
-    const token = createToken(user._id)
+  const token = createToken(user._id, user.role)
     logger.info(`User logged in: ${email}`)
 
     return res.status(200).json({
@@ -86,7 +86,7 @@ router.post("/login", async (req, res, next) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        faculty: user.facility,
+        faculty: user.faculty,
       },
     })
   } catch (err) {

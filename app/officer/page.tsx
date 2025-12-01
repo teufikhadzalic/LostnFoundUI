@@ -36,12 +36,47 @@ export default function OfficerPage() {
 
   useEffect(() => {
     const userData = localStorage.getItem("user")
+    const token = localStorage.getItem("token")
+
+    const parseJwt = (tkn: string | null) => {
+      if (!tkn) return null
+      try {
+        const parts = tkn.split('.')
+        if (parts.length < 2) return null
+        const payload = parts[1]
+        const b64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+        const json = decodeURIComponent(
+          atob(b64)
+            .split('')
+            .map(function (c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+            })
+            .join(''),
+        )
+        return JSON.parse(json)
+      } catch (e) {
+        return null
+      }
+    }
+
     if (!userData) {
-      router.push("/login")
+      // try to recover role from token if available
+      const decoded = parseJwt(token)
+      if (decoded?.role === 'officer') {
+        setUser({ userId: decoded.userId, role: decoded.role })
+        fetchClaims()
+        return
+      }
+      router.push('/login')
       return
     }
 
     const parsedUser = JSON.parse(userData)
+    if (!parsedUser.role) {
+      const decoded = parseJwt(token)
+      if (decoded?.role) parsedUser.role = decoded.role
+    }
+
     if (parsedUser.role !== "officer") {
       router.push("/feed")
       return
@@ -62,10 +97,35 @@ export default function OfficerPage() {
         },
       )
 
-      if (res.ok) {
-        const data = await res.json()
-        setClaims(data)
+      if (!res.ok) {
+        // Try to parse error body, but fall back to status text
+        let errBody = null
+        try {
+          errBody = await res.json()
+        } catch (e) {
+          /* ignore */
+        }
+
+        if (res.status === 401) {
+          // Not authenticated
+          toast({ variant: "destructive", title: "Unauthorized", description: "Please login again" })
+          router.push("/login")
+          return
+        }
+        if (res.status === 403) {
+          // Not an officer
+          toast({ variant: "destructive", title: "Forbidden", description: "Officer access required" })
+          router.push("/feed")
+          return
+        }
+
+        toast({ variant: "destructive", title: "Error", description: errBody?.error || "Gagal memuat klaim" })
+        return
       }
+
+      // Success
+      const data = await res.json()
+      setClaims(data)
     } catch (err) {
       toast({
         variant: "destructive",

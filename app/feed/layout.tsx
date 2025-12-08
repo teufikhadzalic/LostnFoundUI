@@ -36,15 +36,13 @@ export default function FeedLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex bg-gray-50">
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Content Area */}
         <main className="flex-1 overflow-auto pb-20 lg:pb-0 ">
-          <div className="max-w-4xl mx-auto px-6 py-8">{children}</div>
+          <div className="mx-auto px-6 py-8">{children}</div>
         </main>
-      </div>
 
       {/* Mobile Bottom Navigation */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white">

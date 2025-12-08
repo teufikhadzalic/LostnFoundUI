@@ -85,7 +85,7 @@ export default function OfficerLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex bg-gray-50">
       {/* Sidebar is provided by RootLayout (fixed). */}
 
       {/* Main Content */}

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast"
 import { formatDateTime } from "@/lib/formatDate"
 import { Button } from "@/components/ui/button"
 import VerificationModal from "@/components/officer/verification-modal"
+import { CheckCircle2, Clock, XCircle, MessageCircle, AlertCircle } from "lucide-react"
 
 interface Claim {
   _id: string
@@ -35,7 +36,6 @@ interface ClaimVerificationCardProps {
 export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerificationCardProps) {
   const [showModal, setShowModal] = useState(false)
   const [selectedAction, setSelectedAction] = useState<"approve" | "reject" | null>(null)
-  const [chatLoading, setChatLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -44,157 +44,151 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
     setShowModal(true)
   }
 
-  const statusColor = {
-    pending: "bg-yellow-100 text-yellow-700",
-    approved: "bg-green-100 text-green-700",
-    rejected: "bg-red-100 text-red-700",
+  // Status Styles
+  const statusConfig = {
+    pending: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200",
+      icon: <Clock className="w-4 h-4" />,
+      label: "Menunggu"
+    },
+    approved: {
+      bg: "bg-emerald-50",
+      text: "text-emerald-700",
+      border: "border-emerald-200",
+      icon: <CheckCircle2 className="w-4 h-4" />,
+      label: "Disetujui"
+    },
+    rejected: {
+      bg: "bg-rose-50",
+      text: "text-rose-700",
+      border: "border-rose-200",
+      icon: <XCircle className="w-4 h-4" />,
+      label: "Ditolak"
+    }
   }
 
-  const statusLabel = {
-    pending: "Menunggu Verifikasi",
-    approved: "Disetujui",
-    rejected: "Ditolak",
-  }
+  const currentStatus = statusConfig[claim.status]
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition">
-        <div className="p-6">
-          {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">{claim.postId ? claim.postId.itemName : "(Barang hilang atau dihapus)"}</h3>
-              <p className={`text-xs font-semibold px-3 py-1 rounded-full w-fit mt-2 ${statusColor[claim.status]}`}>
-                {statusLabel[claim.status]}
-              </p>
-            </div>
-            <p className="text-sm text-gray-600">{formatDateTime(claim.createdAt)}</p>
-          </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden">
+        {/* Header Ribbon */}
+        <div className={`h-2 w-full ${claim.status === 'approved' ? 'bg-emerald-500' : claim.status === 'rejected' ? 'bg-rose-500' : 'bg-amber-400'}`}></div>
 
-          {/* Content Grid */}
-          <div className="grid md:grid-cols-3 gap-6 mb-6">
-            {/* Item Image */}
-            <div>
-              <p className="text-sm font-semibold text-gray-900 mb-3">Foto Barang</p>
-              <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
+        <div className="p-6">
+          {/* Top Row: Item Name & Status */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
                 <img
                   src={(claim.postId && claim.postId.image) || "/placeholder.svg"}
-                  alt={(claim.postId && claim.postId.itemName) || "Foto barang"}
+                  alt="Item"
                   className="w-full h-full object-cover"
                 />
               </div>
-            </div>
-
-            {/* Owner Photo */}
-            <div>
-              <p className="text-sm font-semibold text-gray-900 mb-3">Foto Pemilik + Barang</p>
-              <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
-                <img
-                  src={claim.ownerPhoto || "/placeholder.svg"}
-                  alt="Pemilik dengan barang"
-                  className="w-full h-full object-cover"
-                />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                  {claim.postId ? claim.postId.itemName : "(Item Deleted)"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Diajukan: {formatDateTime(claim.createdAt)}</p>
               </div>
             </div>
 
-            {/* NPM Photo */}
-            <div>
-              <p className="text-sm font-semibold text-gray-900 mb-3">Foto Kartu NPM</p>
-              <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100">
-                <img
-                  src={claim.npmPhoto || "/placeholder.svg"}
-                  alt="Kartu NPM"
-                  className="w-full h-full object-cover"
-                />
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border}`}>
+              {currentStatus.icon}
+              <span className="text-sm font-bold">{currentStatus.label}</span>
+            </div>
+          </div>
+
+          {/* Evidence Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            {/* Left: Photos */}
+            <div className="space-y-4">
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Bukti Foto</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 cursor-pointer">
+                  <img src={claim.ownerPhoto || "/placeholder.svg"} alt="Bukti 1" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-white text-xs font-semibold">Foto Barang</span>
+                  </div>
+                </div>
+                <div className="group relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 cursor-pointer">
+                  <img src={claim.npmPhoto || "/placeholder.svg"} alt="Bukti 2" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-white text-xs font-semibold">KTM/Identitas</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Info & Reasoning */}
+            <div className="flex flex-col justify-between">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Pemohon</h4>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold">
+                      {claim.userId.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">{claim.userId.name}</p>
+                      <p className="text-xs text-gray-500 font-mono">{claim.userId.npm}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Alasan Klaim</h4>
+                  <div className="relative p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-700 italic">
+                    <span className="absolute -top-2 -left-1 text-4xl text-gray-200 font-serif leading-none">“</span>
+                    {claim.reason}
+                    <span className="absolute -bottom-4 -right-1 text-4xl text-gray-200 font-serif leading-none">”</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Claimant Info */}
-          <div className="grid md:grid-cols-2 gap-6 mb-6 border-t border-gray-200 pt-6">
-            <div>
-              <p className="text-sm font-semibold text-gray-900 mb-2">Data Pemohon</p>
-              <div className="space-y-2 text-sm text-gray-700">
-                <p>
-                  <span className="font-semibold">Nama:</span> {claim.userId.name}
-                </p>
-                <p>
-                  <span className="font-semibold">NPM:</span> {claim.userId.npm}
-                </p>
-              </div>
-            </div>
+          {/* Action Footer */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-50">
+            {/* Chat Button */}
+            {/* Chat/Comment Button */}
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (claim.postId && claim.postId._id) {
+                  router.push(`/feed?postId=${claim.postId._id}`)
+                } else {
+                  toast({ description: "Detail post tidak tersedia", variant: "destructive" })
+                }
+              }}
+              className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Beri Komentar
+            </Button>
 
-            <div>
-              <p className="text-sm font-semibold text-gray-900 mb-2">Alasan Klaim</p>
-              <p className="text-sm text-gray-700">{claim.reason}</p>
-            </div>
-          </div>
+            <div className="flex-1"></div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            {claim.status === "pending" ? (
-              <>
+            {claim.status === "pending" && (
+              <div className="flex gap-2 w-full sm:w-auto">
                 <Button
-                  onClick={() => handleAction("reject")}
                   variant="outline"
-                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={() => handleAction("reject")}
+                  className="flex-1 sm:flex-none border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
                 >
                   Tolak
                 </Button>
                 <Button
                   onClick={() => handleAction("approve")}
-                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold"
+                  className="flex-1 sm:flex-none bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
                 >
-                  Setujui
+                  Setujui Klaim
                 </Button>
-              </>
-            ) : (
-              <div className="flex-1" />
+              </div>
             )}
-
-            {/* Chat button available for officer to open/create conversation */}
-            <Button
-              onClick={async () => {
-                if (!claim._id) return
-                setChatLoading(true)
-                try {
-                  const token = localStorage.getItem("token")
-                  let res
-                  // Prefer post-level conversation if we have a post id
-                  if (claim.postId && claim.postId._id) {
-                    const claimerId = claim.userId?._id
-                    const q = claimerId ? `?claimer=${claimerId}` : ""
-                    res = await fetch(`/api/post/${claim.postId._id}${q}`, { headers: { Authorization: `Bearer ${token}` } })
-                  } else {
-                    res = await fetch(`/api/claim/${claim._id}`, { headers: { Authorization: `Bearer ${token}` } })
-                  }
-
-                  if (!res.ok) {
-                    // try to surface server error message
-                    let errBody = null
-                    try {
-                      errBody = await res.json()
-                    } catch (e) {
-                      /* ignore */
-                    }
-                    throw new Error(errBody?.error || res.statusText || "Gagal membuka chat")
-                  }
-
-                  const data = await res.json()
-                  const chatId = data._id || data._doc?._id || data.id
-                  if (!chatId) throw new Error("Chat id tidak ditemukan")
-                  router.push(`/officer/chat/${chatId}`)
-                } catch (e) {
-                  toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Gagal membuka chat" })
-                } finally {
-                  setChatLoading(false)
-                }
-              }}
-              disabled={chatLoading}
-              className="ml-auto bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-            >
-              {chatLoading ? "Membuka..." : "Buka Chat"}
-            </Button>
           </div>
         </div>
       </div>

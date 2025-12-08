@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import React from "react"
-import Sidebar from "@/components/layout/sidebar"
+import Navbar from "@/components/layout/navbar"
 
 interface Props {
   children: React.ReactNode
@@ -11,29 +11,35 @@ interface Props {
 export default function ClientLayout({ children }: Props) {
   const pathname = usePathname() || "/"
 
-  // hide sidebar on main page (`/`) and login page (`/login`)
-  const hideSidebar = pathname === "/" || pathname === "/login" || pathname === "/register"
+  // hide navbar on login/register pages if desired? 
+  // Usually landing page (/) might want a different nav or the same one. 
+  // Based on previous code, sidebar was hidden on / and /login.
+  // Let's assume user wants Navbar everywhere EXCEPT login/register for simplicity, or maybe same rules.
+  // Sidebar was: const hideSidebar = pathname === "/" || pathname === "/login" || pathname === "/register"
+
+  const hideNavbar = pathname === "/login" || pathname === "/register"
+  // Note: if pathname === "/" (Landing), we might want to show it or have a special landing nav. 
+  // For now let's keep it consistent: if it was hidden before, maybe hide it? 
+  // Actually, usually headers are good on landing pages. Let's show it on "/" unless user logged out? 
+  // The sidebar logic hid it on "/". Let's use the same logic for now to be safe, but "top header" usually implies standard web nav.
+  // Let's stick to the previous hiding rule to avoid breaking landing page design if it has its own hero section.
+  const isAuthPage = pathname === "/login" || pathname === "/register"
+  const isLanding = pathname === "/"
+
+  const showNavbar = !isAuthPage && !isLanding
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Sidebar fixed on left for md+ when not hidden */}
-      {!hideSidebar && (
-        <div className="hidden md:block">
-          <aside className="fixed left-0 top-0 h-full w-64 lg:w-72 z-20">
-            <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <Sidebar />
-            </div>
-          </aside>
-        </div>
-      )}
+      {/* Top Navbar */}
+      {showNavbar && <Navbar />}
 
-      {/* Main area — add left padding on md+ only when sidebar is visible */}
-      <main className={`${!hideSidebar ? "md:pl-64 lg:pl-72" : ""}`}>
+      {/* Main Content */}
+      {/* Add top padding to account for fixed navbar (h-16 = 4rem = pt-16) */}
+      <main className={`${showNavbar ? "pt-16" : ""}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-8">{children}</div>
         </div>
       </main>
-  {/* global chat widget removed */}
     </div>
   )
 }

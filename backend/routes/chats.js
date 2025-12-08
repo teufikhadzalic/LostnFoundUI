@@ -101,7 +101,10 @@ router.post("/", authMiddleware, async (req, res) => {
 // Get or create conversation for a post (single thread per post). Optional query param `claimer` to include a claimant in participants
 router.get("/post/:postId", authMiddleware, async (req, res) => {
   try {
+    console.log(`[DEBUG] GET /api/chats/post/${req.params.postId}`)
     const post = await Post.findById(req.params.postId).populate("userId")
+    console.log(`[DEBUG] Post found:`, post ? post._id : "null")
+
     if (!post) {
       logger.warn(`GET /api/chats/post/:postId — post not found: ${req.params.postId}`)
       return res.status(404).json({ error: "Post not found" })

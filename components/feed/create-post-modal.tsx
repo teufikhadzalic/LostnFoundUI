@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { UploadCloud, Sparkles, X, MapPin, Building2, Tag } from "lucide-react"
 
 const FACULTIES = [
   "Ilmu Komputer",
@@ -45,6 +46,7 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
     image: "",
   })
   const [loading, setLoading] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const { toast } = useToast()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -59,12 +61,24 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    processFile(file)
+  }
 
+  const processFile = (file: File) => {
     const reader = new FileReader()
     reader.onloadend = () => {
       setFormData((prev) => ({ ...prev, image: reader.result as string }))
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) {
+      processFile(file)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,7 +116,7 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
 
       toast({
         title: "Berhasil",
-        description: "Post berhasil dibuat!",
+        description: "Laporan berhasil dipublikasikan!",
       })
 
       onPostCreated()
@@ -118,172 +132,171 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="border-b border-gray-200 p-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Buat Laporan Baru</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            ✕
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl max-w-3xl w-full overflow-y-auto shadow-2xl flex flex-col md:flex-row overflow-hidden border border-gray-100">
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Type Selection */}
+        {/* Left Side: Visual/Type */}
+        <div className={`p-8 md:w-1/3 flex flex-col justify-between text-white ${type === 'lost' ? 'bg-gradient-to-br from-red-500 to-rose-600' : 'bg-gradient-to-br from-emerald-500 to-teal-600'}`}>
           <div>
-            <label className="text-sm font-semibold text-gray-900 mb-3 block">Jenis Laporan</label>
-            <div className="flex gap-4">
+            <div className="bg-white/20 w-fit px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md mb-6">
+              Laporan Baru
+            </div>
+            <h2 className="text-3xl font-bold mb-4">{type === 'lost' ? 'Barang Hilang' : 'Barang Ditemukan'}</h2>
+            <p className="text-white/80 text-sm leading-relaxed">
+              {type === 'lost'
+                ? "Bantu kami menemukan barangmu dengan memberikan informasi sedetail mungkin."
+                : "Terima kasih orang baik! Laporanmu akan sangat membantu pemilik barang."}
+            </p>
+          </div>
+
+          <div className="space-y-3 mt-8">
+            <p className="text-xs font-bold uppercase tracking-widest opacity-70">Ganti Tipe Laporan</p>
+            <div className="flex flex-col gap-2">
               <button
-                type="button"
-                onClick={() => setType("lost")}
-                className={`flex-1 py-3 rounded-lg border-2 font-semibold transition ${
-                  type === "lost" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 bg-white text-gray-700"
-                }`}
+                onClick={() => setType('lost')}
+                className={`px-4 py-3 rounded-xl text-left text-sm font-bold transition-all ${type === 'lost' ? 'bg-white text-red-600 shadow-lg' : 'bg-black/20 text-white hover:bg-black/30'}`}
               >
-                Barang Hilang
+                🔍 Saya Kehilangan Barang
               </button>
               <button
-                type="button"
-                onClick={() => setType("found")}
-                className={`flex-1 py-3 rounded-lg border-2 font-semibold transition ${
-                  type === "found"
-                    ? "border-green-500 bg-green-50 text-green-700"
-                    : "border-gray-200 bg-white text-gray-700"
-                }`}
+                onClick={() => setType('found')}
+                className={`px-4 py-3 rounded-xl text-left text-sm font-bold transition-all ${type === 'found' ? 'bg-white text-emerald-600 shadow-lg' : 'bg-black/20 text-white hover:bg-black/30'}`}
               >
-                Barang Ditemukan
+                🎁 Saya Menemukan Barang
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Item Name */}
-          <div>
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Nama Barang*</label>
-            <Input
-              type="text"
-              name="itemName"
-              placeholder="Contoh: iPhone 13 Pro Max, Dompet Kulit Coklat"
-              value={formData.itemName}
-              onChange={handleChange}
-              required
-            />
+        {/* Right Side: Form */}
+        <div className="flex-1 bg-white flex flex-col h-full max-h-[90vh] overflow-y-auto md:w-2/3">
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+            <h3 className="font-bold text-gray-900">Detail Informasi</h3>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Deskripsi Detail*</label>
-            <textarea
-              name="description"
-              placeholder="Berikan deskripsi yang detail tentang barang, termasuk ciri khas, warna, merk, dan kondisi..."
-              value={formData.description}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none resize-none"
-              rows={4}
-            />
-          </div>
-
-          {/* Image Upload */}
-          <div>
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Foto Barang*</label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            {/* Image Upload Area */}
+            <div
+              className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${isDragOver ? 'border-yellow-400 bg-yellow-50 scale-[0.99]' : 'border-gray-200 hover:border-yellow-400 hover:bg-gray-50'}`}
+              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={handleDrop}
+            >
               {formData.image ? (
-                <div>
-                  <img
-                    src={formData.image || "/placeholder.svg"}
-                    alt="Preview"
-                    className="max-h-48 mx-auto mb-4 rounded"
-                  />
-                  <label className="cursor-pointer text-yellow-600 font-semibold hover:underline">
-                    Ganti Foto
+                <div className="relative group w-fit mx-auto">
+                  <img src={formData.image} alt="Preview" className="h-48 rounded-lg shadow-md object-cover" />
+                  <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg cursor-pointer">
+                    <span className="text-white font-bold text-sm">Ganti Foto</span>
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   </label>
                 </div>
               ) : (
-                <label className="cursor-pointer">
-                  <span className="text-4xl mb-2 block">📸</span>
-                  <span className="font-semibold text-gray-900">Klik untuk upload foto atau drag & drop</span>
-                  <p className="text-sm text-gray-600 mt-2">Format: JPG, PNG, max 5MB</p>
+                <label className="cursor-pointer flex flex-col items-center">
+                  <div className="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4">
+                    <UploadCloud className="w-8 h-8" />
+                  </div>
+                  <span className="font-bold text-gray-900 text-lg">Upload Foto Barang</span>
+                  <span className="text-gray-500 text-sm mt-1">Drag & drop atau klik untuk browse</span>
                   <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 </label>
               )}
             </div>
-          </div>
 
-          {/* Category & Faculty */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-semibold text-gray-900 mb-2 block">Kategori*</label>
-              <Select value={formData.category} onValueChange={(val) => handleSelectChange("category", val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih kategori..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Nama Barang</label>
+                <Input
+                  value={formData.itemName}
+                  onChange={handleChange}
+                  name="itemName"
+                  placeholder="Contoh: iPhone 13 Pro Max"
+                  className="h-12 rounded-xl border-gray-200 focus:border-yellow-400 focus:ring-yellow-400/20"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Deskripsi</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Ciri-ciri, warna, kondisi..."
+                  className="w-full p-4 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 outline-none transition-all resize-none h-32 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <Tag className="w-3 h-3" />
+                    Kategori
+                  </label>
+                  <Select value={formData.category} onValueChange={(val) => handleSelectChange("category", val)}>
+                    <SelectTrigger className="h-12 rounded-xl border-gray-200">
+                      <SelectValue placeholder="Pilih..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <Building2 className="w-3 h-3" />
+                    Fakultas
+                  </label>
+                  <Select value={formData.faculty} onValueChange={(val) => handleSelectChange("faculty", val)}>
+                    <SelectTrigger className="h-12 rounded-xl border-gray-200">
+                      <SelectValue placeholder="Pilih..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FACULTIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  Lokasi
+                </label>
+                <Select value={formData.location} onValueChange={(val) => handleSelectChange("location", val)}>
+                  <SelectTrigger className="h-12 rounded-xl border-gray-200">
+                    <SelectValue placeholder="Pilih lokasi..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOCATIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <label className="text-sm font-semibold text-gray-900 mb-2 block">Fakultas*</label>
-              <Select value={formData.faculty} onValueChange={(val) => handleSelectChange("faculty", val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih fakultas..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {FACULTIES.map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {f}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-indigo-500 mt-0.5" />
+              <div className="text-sm text-indigo-900">
+                <span className="font-bold block mb-1">AI Powered Match</span>
+                Deskripsi yang detail membantu AI kami mencocokkan barangmu secara otomatis.
+              </div>
             </div>
-          </div>
 
-          {/* Location */}
-          <div>
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">Lokasi Terakhir Dilihat*</label>
-            <Select value={formData.location} onValueChange={(val) => handleSelectChange("location", val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih lokasi..." />
-              </SelectTrigger>
-              <SelectContent>
-                {LOCATIONS.map((l) => (
-                  <SelectItem key={l} value={l}>
-                    {l}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Tips */}
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm font-semibold text-gray-900 mb-2">💡 Tips AI Assistant</p>
-            <p className="text-xs text-gray-700">
-              Sertakan detail seperti merk, warna, ukuran, dan ciri khas untuk membantu AI mencokkan dengan laporan
-              lain.
-            </p>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex gap-4">
-            <Button type="button" onClick={onClose} variant="outline" className="flex-1 border-gray-300 bg-transparent">
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold"
-            >
-              {loading ? "Memproses..." : "Publikasikan Laporan"}
-            </Button>
-          </div>
-        </form>
+            <div className="pt-4 border-t border-gray-100 flex gap-4">
+              <Button type="button" onClick={onClose} variant="ghost" className="flex-1 rounded-xl h-12 font-bold text-gray-500 hover:text-gray-900">
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-[2] rounded-xl h-12 font-bold text-base bg-yellow-400 hover:bg-yellow-500 text-gray-900 shadow-lg shadow-yellow-400/20"
+              >
+                {loading ? "Memproses..." : "Publikasikan Sekarang"}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )

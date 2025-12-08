@@ -3,6 +3,7 @@ import { authMiddleware } from "../middleware/auth.js"
 import Comment from "../models/Comment.js"
 import Notification from "../models/Notification.js"
 import Post from "../models/Post.js"
+import Claim from "../models/Claim.js"
 import logger from "../utils/logger.js"
 
 const router = express.Router()
@@ -30,7 +31,19 @@ router.post("/", authMiddleware, async (req, res) => {
       await Notification.create({
         userId: post.userId,
         type: "new_comment",
-        message: "New comment on your post",
+        message: "Komentar baru di postingan Anda",
+        postId,
+      })
+    }
+
+    // Check for approved claim and notify the claimer
+    const approvedClaim = await Claim.findOne({ postId, status: "approved" })
+    if (approvedClaim && approvedClaim.userId.toString() !== req.user.userId) {
+      // Don't notify if the claimer is the one commenting
+      await Notification.create({
+        userId: approvedClaim.userId,
+        type: "new_comment",
+        message: "Komentar baru di klaim yang disetujui",
         postId,
       })
     }

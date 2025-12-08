@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import CommentSection from "@/components/feed/comment-section"
+import { X, MapPin, Building2, Tag, Calendar, AlertTriangle, Trash2, ShieldCheck, CheckCircle2 } from "lucide-react"
 
 interface Post {
   _id: string
@@ -33,11 +34,7 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
   const formatDateTime = (iso?: string) => {
     if (!iso) return ""
     const d = new Date(iso)
-    const dateStr = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
-    const hh = String(d.getHours()).padStart(2, "0")
-    const mm = String(d.getMinutes()).padStart(2, "0")
-    const ss = String(d.getSeconds()).padStart(2, "0")
-    return `${dateStr} ${hh}:${mm}:${ss}`
+    return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
   }
 
   const [showClaimForm, setShowClaimForm] = useState(false)
@@ -46,7 +43,6 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
   const [deleting, setDeleting] = useState(false)
   const { toast } = useToast()
   const [isOwner, setIsOwner] = useState(false)
-  const [isClosing, setIsClosing] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -63,12 +59,8 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
   }, [post])
 
   useEffect(() => {
-    // trigger entrance animation
-    const t = window.setTimeout(() => setIsMounted(true), 10)
-    return () => {
-      window.clearTimeout(t)
-      setIsMounted(false)
-    }
+    setIsMounted(true)
+    return () => setIsMounted(false)
   }, [])
 
   const handleClaim = async () => {
@@ -97,9 +89,7 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
         }),
       })
 
-      if (!res.ok) {
-        throw new Error("Gagal membuat klaim")
-      }
+      if (!res.ok) throw new Error("Gagal membuat klaim")
 
       toast({
         title: "Berhasil",
@@ -120,183 +110,201 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
     }
   }
 
-  const handleClose = () => {
-    // play close animation then call parent's onClose
-    setIsClosing(true)
-    setIsMounted(false)
-    window.setTimeout(() => {
+  const handleDelete = async () => {
+    const ok = confirm("Yakin ingin menghapus posting ini? Tindakan ini tidak dapat dibatalkan.")
+    if (!ok) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${post._id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+      if (!res.ok) throw new Error("Gagal menghapus post")
+
+      toast({ title: "Berhasil", description: "Posting berhasil dihapus" })
+      onPostUpdated()
       onClose()
-    }, 220)
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal menghapus post" })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
-    <div
-      className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 transition-opacity duration-200 ${
-        isClosing ? "opacity-0" : isMounted ? "opacity-100" : "opacity-0"
-      }`}
-    >
+    <div className={`fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${isMounted ? "opacity-100" : "opacity-0"}`}>
       <div
-        className={`bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-200 ${
-          isClosing ? "opacity-0 scale-95" : isMounted ? "opacity-100 scale-100" : "opacity-0 scale-95"
-        }`}
+        className={`bg-white rounded-2xl w-full max-w-5xl h-[90vh] flex flex-col md:flex-row overflow-hidden shadow-2xl transition-transform duration-300 ${isMounted ? "scale-100" : "scale-95"}`}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Close Button (sticky & on top) */}
-        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 p-4 flex justify-end">
-          <button onClick={handleClose} className="text-gray-500 hover:text-gray-700 text-xl">
-            ✕
-          </button>
+        {/* Close Button Mobile */}
+        <button
+          onClick={onClose}
+          className="md:hidden absolute top-4 right-4 z-20 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Left Side: Image (Full Height on Desktop) */}
+        <div className="md:w-1/2 bg-black flex items-center justify-center relative bg-pattern">
+          <div className="absolute inset-0 bg-black/20" />
+          <img
+            src={post.image || "/placeholder.svg"}
+            alt={post.itemName}
+            className="max-h-full max-w-full object-contain relative z-10"
+          />
+
+          {/* Status Badge Overlay */}
+          <div className="absolute top-6 left-6 z-20 flex flex-col gap-2">
+            <span className={`px-4 py-2 rounded-full text-sm font-bold shadow-lg backdrop-blur-md ${post.type === 'lost' ? 'bg-red-500/90 text-white' : 'bg-emerald-500/90 text-white'
+              }`}>
+              {post.type === 'lost' ? 'Barang Hilang' : 'Barang Ditemukan'}
+            </span>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Image */}
-          <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-gray-100">
-            <img src={post.image || "/placeholder.svg"} alt={post.itemName} className="w-full h-full object-cover" />
+        {/* Right Side: Info & Comments */}
+        <div className="md:w-1/2 flex flex-col h-full bg-white relative">
+          {/* Header Info (Sticky) */}
+          <div className="p-6 border-b border-gray-100 flex-shrink-0 bg-white z-10">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-2">{post.itemName}</h1>
+                <div className="flex flex-wrap gap-2 text-xs font-medium text-gray-500">
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {formatDateTime(post.createdAt)}
+                  </div>
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {post.location}
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button Desktop */}
+              <button onClick={onClose} className="hidden md:flex text-gray-400 hover:text-gray-900">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* User Profile Mini */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                {post.userId?.name?.charAt(0) || "?"}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-gray-900">{post.userId?.name || "Unknown"}</p>
+                <p className="text-xs text-gray-500">Pelapor</p>
+              </div>
+              {isOwner && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Header */}
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <span
-                className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                  post.type === "lost" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                }`}>
-                {post.type === "lost" ? "Barang Hilang" : "Barang Ditemukan"}
-              </span>
-              <span
-                className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                  post.status === "resolved"
-                    ? "bg-green-100 text-green-700"
-                    : post.status === "claimed"
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-yellow-100 text-yellow-700"
-                }`}>
-                {post.status === "resolved" ? "Selesai" : post.status === "claimed" ? "Diklaim" : "Aktif"}
-              </span>
-            </div>
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="p-6 space-y-6">
+              {/* Description */}
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Deskripsi</h3>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{post.description}</p>
+              </div>
 
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.itemName}</h1>
-            <p className="text-gray-700 text-lg mb-6">{post.description}</p>
+              {/* Categories Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border border-gray-100 p-3 rounded-xl">
+                  <span className="text-xs text-gray-400 block mb-1">Kategori</span>
+                  <div className="flex items-center gap-2 font-semibold text-gray-700">
+                    <Tag className="w-4 h-4 text-yellow-500" />
+                    {post.category}
+                  </div>
+                </div>
+                <div className="border border-gray-100 p-3 rounded-xl">
+                  <span className="text-xs text-gray-400 block mb-1">Fakultas</span>
+                  <div className="flex items-center gap-2 font-semibold text-gray-700">
+                    <Building2 className="w-4 h-4 text-yellow-500" />
+                    {post.faculty}
+                  </div>
+                </div>
+              </div>
 
-            {/* Info Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Kategori</p>
-                <p className="font-semibold text-gray-900">{post.category}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Lokasi</p>
-                <p className="font-semibold text-gray-900">{post.location}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Fakultas</p>
-                <p className="font-semibold text-gray-900">{post.faculty}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Waktu</p>
-                <p className="font-semibold text-gray-900">{formatDateTime(post.createdAt)}</p>
-              </div>
-            </div>
-
-            {/* User Info */}
-            <div className="border-t border-gray-200 pt-6 pb-6">
-              <p className="text-sm text-gray-600 mb-3">Dilaporkan oleh</p>
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const reporterName = post?.userId?.name ?? "Unknown User"
-                  const reporterInitial = reporterName && typeof reporterName === "string" && reporterName.length > 0 ? reporterName.charAt(0).toUpperCase() : "?"
-                  const reporterId = post?.userId?._id ?? ""
-                  return (
-                    <>
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center text-white font-bold">
-                        {reporterInitial}
+              {/* Claim Action Area */}
+              {post.status !== "resolved" && !isOwner && (
+                <div className={`rounded-xl p-6 transition-all ${showClaimForm ? 'bg-white border-2 border-yellow-400 shadow-xl' : 'bg-yellow-50 border border-yellow-200'}`}>
+                  {!showClaimForm ? (
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-3 text-white shadow-lg shadow-yellow-400/30">
+                        <ShieldCheck className="w-6 h-6" />
                       </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">{reporterName}</p>
-                        <p className="text-sm text-gray-600">{reporterId}</p>
+                      <h3 className="font-bold text-gray-900 mb-1">Barang ini milik Anda?</h3>
+                      <p className="text-sm text-gray-600 mb-4">Ajukan klaim kepemilikan untuk diverifikasi oleh officer.</p>
+                      <Button
+                        onClick={() => setShowClaimForm(true)}
+                        className="w-full bg-gray-900 text-white hover:bg-black rounded-lg h-11 font-bold shadow-lg"
+                      >
+                        Ajukan Klaim
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-gray-900">Form Pengajuan Klaim</h3>
+                        <button onClick={() => setShowClaimForm(false)} className="text-gray-400 hover:text-gray-900"><X className="w-4 h-4" /></button>
                       </div>
-                    </>
-                  )
-                })()}
-              </div>
-            </div>
 
-            {/* Claim Section */}
-            {post.status !== "resolved" && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                {!showClaimForm ? (
-                  <Button
-                    onClick={() => setShowClaimForm(true)}
-                    className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold py-6"
-                  >
-                    Klaim Barang Ini
-                  </Button>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-semibold text-gray-900 mb-2 block">Alasan Klaim</label>
                       <textarea
-                        placeholder="Jelaskan mengapa Anda menganggap barang ini milik Anda atau alasan lainnya..."
+                        placeholder="Jelaskan secara detail kenapa barang ini milik Anda (ciri khusus, isi, dll)..."
                         value={claimReason}
                         onChange={(e) => setClaimReason(e.target.value)}
-                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none resize-none"
-                        rows={3}
+                        className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 outline-none resize-none text-sm h-32"
                       />
-                    </div>
-                    <p className="text-xs text-gray-600">
-                      Note: Officer akan meminta foto Anda dengan barang dan foto NPM untuk verifikasi
-                    </p>
-                    <div className="flex gap-3">
-                      <Button onClick={() => setShowClaimForm(false)} variant="outline" className="flex-1 border-gray-300">
-                        Batal
+
+                      <div className="bg-blue-50 text-blue-700 text-xs p-3 rounded-lg flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>Officer akan meminta bukti tambahan (Foto KTM + Foto diri dengan barang) setelah pengajuan ini.</span>
+                      </div>
+
+                      <Button
+                        onClick={handleClaim}
+                        disabled={loading}
+                        className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold h-11"
+                      >
+                        {loading ? "Mengirim..." : "Kirim Pengajuan"}
                       </Button>
-                      <Button onClick={handleClaim} disabled={loading} className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold">
-                        {loading ? "Memproses..." : "Kirim Klaim"}
-                      </Button>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {post.status === 'resolved' && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3 text-green-700">
+                  <CheckCircle2 className="w-6 h-6" />
+                  <div>
+                    <p className="font-bold">Masalah Terselesaikan</p>
+                    <p className="text-xs">Barang ini telah dikembalikan kepada pemiliknya.</p>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Owner actions */}
-            {isOwner && (
-              <div className="mt-4 flex gap-3">
-                <Button
-                  variant="destructive"
-                  onClick={async () => {
-                    const ok = confirm("Yakin ingin menghapus posting ini? Tindakan ini tidak dapat dibatalkan.")
-                    if (!ok) return
-                    setDeleting(true)
-                    try {
-                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${post._id}`, {
-                        method: "DELETE",
-                        headers: {
-                          Authorization: `Bearer ${localStorage.getItem("token")}`,
-                        },
-                      })
-                      if (!res.ok) throw new Error("Gagal menghapus post")
-
-                      toast({ title: "Berhasil", description: "Posting berhasil dihapus" })
-                      onPostUpdated()
-                      // animate close then signal parent
-                      handleClose()
-                    } catch (err) {
-                      toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal menghapus post" })
-                    } finally {
-                      setDeleting(false)
-                    }
-                  }}
-                  disabled={deleting}
-                  className="bg-red-500 hover:bg-red-600 text-white"
-                >
-                  {deleting ? "Menghapus..." : "Hapus Post"}
-                </Button>
+              {/* Comments */}
+              <div className="pt-6 border-t border-gray-100">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Diskusi</h3>
+                <CommentSection postId={post._id} />
               </div>
-            )}
+            </div>
           </div>
-
-          {/* Comments Section */}
-          <CommentSection postId={post._id} />
         </div>
       </div>
     </div>

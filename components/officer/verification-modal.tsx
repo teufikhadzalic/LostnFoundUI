@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { CheckCircle2, XCircle, AlertCircle } from "lucide-react"
 
 interface Claim {
   _id: string
@@ -73,50 +74,59 @@ export default function VerificationModal({ claim, action, onClose, onVerify }: 
   const isApprove = action === "approve"
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full">
-        <div className={`border-b ${isApprove ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"} p-6`}>
-          <h2 className={`text-xl font-bold ${isApprove ? "text-green-900" : "text-red-900"}`}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden transform scale-100 transition-all">
+
+        {/* Header Graphic */}
+        <div className={`h-32 flex flex-col items-center justify-center text-white ${isApprove ? "bg-emerald-500" : "bg-rose-500"}`}>
+          {isApprove ? <CheckCircle2 className="w-12 h-12 mb-2" /> : <XCircle className="w-12 h-12 mb-2" />}
+          <h2 className="text-2xl font-bold">
             {isApprove ? "Setujui Klaim" : "Tolak Klaim"}
           </h2>
-          <p className={`text-sm mt-1 ${isApprove ? "text-green-700" : "text-red-700"}`}>
-            {isApprove
-              ? `Klaim dari ${claim.userId.name} untuk ${claim.postId.itemName} akan disetujui`
-              : `Klaim dari ${claim.userId.name} untuk ${claim.postId.itemName} akan ditolak`}
-          </p>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="text-sm font-semibold text-gray-900 mb-2 block">
-              Catatan {isApprove ? "Persetujuan" : "Penolakan"} (Opsional)
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                isApprove
-                  ? "Misalnya: Verifikasi berhasil, identitas cocok"
-                  : "Misalnya: Foto NPM tidak jelas, alasan klaim mencurigakan"
-              }
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none resize-none"
-              rows={4}
-            />
+        <div className="p-6">
+          <div className="text-center mb-6">
+            <p className="text-gray-600 text-sm leading-relaxed">
+              Anda akan {isApprove ? <span className="text-emerald-600 font-bold">menyetujui</span> : <span className="text-rose-600 font-bold">menolak</span>} klaim barang
+              <br /><span className="font-bold text-gray-900">"{claim.postId.itemName}"</span><br />
+              yang diajukan oleh <span className="font-bold text-gray-900">{claim.userId.name}</span>.
+            </p>
           </div>
 
-          <div className="flex gap-3">
-            <Button onClick={onClose} variant="outline" className="flex-1 border-gray-300 bg-transparent">
-              Batal
-            </Button>
-            <Button
-              onClick={handleVerify}
-              disabled={loading}
-              className={`flex-1 ${
-                isApprove ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
-              } text-white font-semibold`}
-            >
-              {loading ? "Memproses..." : isApprove ? "Setujui" : "Tolak"}
-            </Button>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                Catatan Officer
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Tambahkan alasan atau catatan..."
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none resize-none text-sm transition-all"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={onClose}
+                variant="ghost"
+                className="flex-1 rounded-xl h-11 text-gray-500 hover:text-gray-900"
+              >
+                Batal
+              </Button>
+              <Button
+                onClick={handleVerify}
+                disabled={loading}
+                className={`flex-[2] rounded-xl h-11 font-bold shadow-lg text-white border-0 ${isApprove
+                    ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200"
+                    : "bg-rose-500 hover:bg-rose-600 shadow-rose-200"
+                  }`}
+              >
+                {loading ? "Memproses..." : "Konfirmasi"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

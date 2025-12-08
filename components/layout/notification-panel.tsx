@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Spinner } from "@/components/ui/spinner"
 import PostDetailModal from "@/components/feed/post-detail-modal"
 import { formatDateTime } from "@/lib/formatDate"
+import { Bell, CheckCircle2, XCircle, Info, MessageCircle, AlertCircle } from "lucide-react"
 
 interface Notification {
   _id: string
@@ -14,7 +15,6 @@ interface Notification {
   createdAt: string
   postId?: string
   claimId?: string
-  // optional embedded post payload — when available the UI will open modal without an extra fetch
   post?: any
 }
 
@@ -22,12 +22,11 @@ export default function NotificationPanel() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPost, setSelectedPost] = useState<any | null>(null)
-  const [postLoading, setPostLoading] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 5000) // Poll every 5s
+    const interval = setInterval(fetchNotifications, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -68,141 +67,82 @@ export default function NotificationPanel() {
   }
 
   const openNotification = async (notification: Notification) => {
-    // mark as read locally & server
-  markAsRead(notification._id)
+    markAsRead(notification._id)
 
-    // If notification already includes post payload, use it (fast path)
     if (notification.post) {
       setSelectedPost(notification.post)
       return
     }
 
-    // if notification references a postId, fetch it and open modal
     if (notification.postId) {
       try {
-  setPostLoading(true)
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${notification.postId}`)
         if (!res.ok) throw new Error("Gagal memuat posting")
         const data = await res.json()
         setSelectedPost(data)
       } catch (err) {
-        toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal memuat posting" })
-      } finally {
-        setPostLoading(false)
+        toast({ variant: "destructive", title: "Error", description: "Gagal memuat detail" })
       }
       return
     }
 
-    // If notification references a claimId, fetch claim detail and open related post
-    if (notification.claimId) {
-      try {
-        setPostLoading(true)
-        const resClaim = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/claims/detail/${notification.claimId}`)
-        if (!resClaim.ok) throw new Error("Gagal memuat klaim")
-        const claim = await resClaim.json()
-        if (claim.postId) {
-          // claim.postId is populated by backend
-          setSelectedPost(claim.postId)
-        } else {
-          toast({ title: "Notifikasi", description: notification.message })
-        }
-      } catch (err) {
-        toast({ variant: "destructive", title: "Error", description: err instanceof Error ? err.message : "Gagal memuat klaim" })
-      } finally {
-        setPostLoading(false)
-      }
-      return
-    }
-
-    // fallback: just show message
-    toast({ title: "Notifikasi", description: notification.message })
+    // Fallback for simple messages
+    toast({ title: "Info", description: notification.message })
   }
 
-  const getNotificationColor = (type: string) => {
+  const getIcon = (type: string) => {
     switch (type) {
-      case "claim_approved":
-        return "border-l-4 border-l-green-500 bg-green-50"
-      case "claim_rejected":
-        return "border-l-4 border-l-red-500 bg-red-50"
-      case "post_claimed":
-        return "border-l-4 border-l-blue-500 bg-blue-50"
-      case "new_comment":
-        return "border-l-4 border-l-yellow-500 bg-yellow-50"
-      case "match_found":
-        return "border-l-4 border-l-indigo-500 bg-indigo-50"
-      default:
-        return "border-l-4 border-l-gray-500 bg-gray-50"
+      case "claim_approved": return <CheckCircle2 className="w-5 h-5 text-green-500" />
+      case "claim_rejected": return <XCircle className="w-5 h-5 text-red-500" />
+      case "new_comment": return <MessageCircle className="w-5 h-5 text-yellow-500" />
+      default: return <Info className="w-5 h-5 text-blue-500" />
     }
   }
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "claim_approved":
-        return "✓"
-      case "claim_rejected":
-        return "✕"
-      case "post_claimed":
-        return "🎯"
-      case "new_comment":
-        return "💬"
-      default:
-        return "ℹ"
-    }
-  }
-
-  const unreadCount = notifications.filter((n) => !n.read).length
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="border-b border-gray-200 p-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Notifikasi</h2>
-          {unreadCount > 0 && <p className="text-sm text-gray-600 mt-1">{unreadCount} belum dibaca</p>}
+    <div className="flex flex-col h-full bg-white min-h-[500px]">
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          Memuat notifikasi...
         </div>
-      </div>
+      ) : notifications.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
+          <Bell className="w-12 h-12 mb-4 opacity-20" />
+          <p>Belum ada notifikasi baru</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {notifications.map((n) => (
+            <div
+              key={n._id}
+              onClick={() => openNotification(n)}
+              className={`p-4 flex gap-4 hover:bg-gray-50 transition-colors cursor-pointer relative group ${!n.read ? "bg-blue-50/30" : ""}`}
+            >
+              {/* Unread Indicator */}
+              {!n.read && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full" />}
 
-      {/* Notifications List */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="p-6 text-center text-gray-600">Loading...</div>
-        ) : notifications.length === 0 ? (
-          <div className="p-6 text-center text-gray-600">Tidak ada notifikasi</div>
-        ) : (
-          <div className="space-y-0">
-            {notifications.map((notification) => (
-              <div
-                key={notification._id}
-                className={`border-b border-gray-100 p-4 cursor-pointer hover:bg-gray-100 active:scale-[0.99] transition-all duration-200 ${getNotificationColor(
-                  notification.type,
-                )}`}
-                onClick={() => openNotification(notification)}
-              >
-                <div className="flex gap-3">
-                  <div className="text-lg flex-shrink-0 mt-0.5">{getNotificationIcon(notification.type)}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${!notification.read ? "font-semibold" : ""} text-gray-900`}>
-                      {notification.message}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">{formatDateTime(notification.createdAt)}</p>
-                  </div>
-                  {!notification.read && <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0 mt-2"></div>}
-                </div>
+              <div className="mt-1 flex-shrink-0">
+                {getIcon(n.type)}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div className="flex-1">
+                <p className={`text-sm text-gray-900 ${!n.read ? "font-bold" : "font-medium"}`}>
+                  {n.message}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formatDateTime(n.createdAt)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-4 text-center">
-        <button onClick={fetchNotifications} className="text-sm text-yellow-600 hover:text-yellow-700 font-semibold">
-          Refresh
-        </button>
-      </div>
-
-      {selectedPost && (
-        <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} onPostUpdated={() => { fetchNotifications(); setSelectedPost(null) }} />
+      {selectedPost && selectedPost.userId && (
+        <PostDetailModal
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onPostUpdated={fetchNotifications}
+        />
       )}
     </div>
   )

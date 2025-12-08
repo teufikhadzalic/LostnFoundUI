@@ -279,9 +279,18 @@ router.get("/", async (req, res) => {
     const { faculty, category, search, type } = req.query
     const filter = { status: "active" }
 
-    if (faculty) filter.faculty = faculty
-    if (category) filter.category = category
-    if (type) filter.type = type
+    if (faculty) {
+      const faculties = faculty.split(',').filter(Boolean)
+      if (faculties.length > 0) filter.faculty = { $in: faculties }
+    }
+    if (category) {
+      const categories = category.split(',').filter(Boolean)
+      if (categories.length > 0) filter.category = { $in: categories }
+    }
+    if (type) {
+      const types = type.split(',').filter(Boolean)
+      if (types.length > 0) filter.type = { $in: types }
+    }
     if (search)
       filter.$or = [{ itemName: { $regex: search, $options: "i" } }, { description: { $regex: search, $options: "i" } }]
 

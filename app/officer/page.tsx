@@ -30,7 +30,7 @@ export default function OfficerPage() {
   const [claims, setClaims] = useState<Claim[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
-  const [filter, setFilter] = useState<"pending" | "all">("pending")
+  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending")
   const router = useRouter()
   const { toast } = useToast()
 
@@ -137,7 +137,8 @@ export default function OfficerPage() {
     }
   }
 
-  const filteredClaims = filter === "pending" ? claims.filter((c) => c.status === "pending") : claims
+  // Updated filter logic
+  const filteredClaims = filter === "all" ? claims : claims.filter((c) => c.status === filter)
 
   const stats = {
     total: claims.length,
@@ -156,47 +157,53 @@ export default function OfficerPage() {
         <p className="text-gray-600 mt-2">Verifikasi klaim barang yang dikirim oleh mahasiswa</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid (Clickable) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        {/* All Claims */}
+        <div
+          onClick={() => setFilter("all")}
+          className={`cursor-pointer bg-white rounded-xl border p-6 transition hover:shadow-md ${filter === 'all' ? 'border-yellow-400 ring-2 ring-yellow-400/20' : 'border-gray-200'}`}
+        >
           <p className="text-sm text-gray-600 mb-2">Total Klaim</p>
           <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
         </div>
-        <div className="bg-white rounded-xl border border-yellow-200 p-6">
+
+        {/* Pending */}
+        <div
+          onClick={() => setFilter("pending")}
+          className={`cursor-pointer bg-white rounded-xl border p-6 transition hover:shadow-md ${filter === 'pending' ? 'border-yellow-400 ring-2 ring-yellow-400/20 bg-yellow-50' : 'border-yellow-200'}`}
+        >
           <p className="text-sm text-yellow-700 mb-2">Menunggu</p>
           <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
         </div>
-        <div className="bg-white rounded-xl border border-green-200 p-6">
+
+        {/* Approved */}
+        <div
+          onClick={() => setFilter("approved")}
+          className={`cursor-pointer bg-white rounded-xl border p-6 transition hover:shadow-md ${filter === 'approved' ? 'border-green-500 ring-2 ring-green-500/20 bg-green-50' : 'border-green-200'}`}
+        >
           <p className="text-sm text-green-700 mb-2">Disetujui</p>
           <p className="text-3xl font-bold text-green-600">{stats.approved}</p>
         </div>
-        <div className="bg-white rounded-xl border border-red-200 p-6">
+
+        {/* Rejected */}
+        <div
+          onClick={() => setFilter("rejected")}
+          className={`cursor-pointer bg-white rounded-xl border p-6 transition hover:shadow-md ${filter === 'rejected' ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50' : 'border-red-200'}`}
+        >
           <p className="text-sm text-red-700 mb-2">Ditolak</p>
           <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2">
-        <Button
-          onClick={() => setFilter("pending")}
-          className={`${
-            filter === "pending"
-              ? "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-              : "bg-white border border-gray-300 text-gray-900 hover:bg-gray-50"
-          } font-semibold`}
-        >
-          Klaim Menunggu ({stats.pending})
-        </Button>
-        <Button
-          onClick={() => setFilter("all")}
-          variant="outline"
-          className={`${
-            filter === "all" ? "bg-yellow-400 hover:bg-yellow-500 text-gray-900 border-yellow-400" : "border-gray-300"
-          } font-semibold`}
-        >
-          Semua Klaim ({stats.total})
-        </Button>
+      {/* Filter Status Text */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-800">
+          {filter === "all" && "Semua Klaim"}
+          {filter === "pending" && "Menunggu Verifikasi"}
+          {filter === "approved" && "Klaim Disetujui"}
+          {filter === "rejected" && "Klaim Ditolak"}
+        </h2>
       </div>
 
       {/* Claims List */}

@@ -277,7 +277,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const { faculty, category, search, type } = req.query
-    const filter = { status: "active" }
+    const filter = { status: { $in: ["active", "claimed"] } }
 
     if (faculty) {
       const faculties = faculty.split(',').filter(Boolean)

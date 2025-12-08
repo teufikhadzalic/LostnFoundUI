@@ -9,9 +9,9 @@ const router = express.Router()
 
 router.post("/", authMiddleware, async (req, res) => {
   try {
-    const { postId, reason, ownerPhoto, npmPhoto } = req.body
+    const { postId, reason } = req.body
 
-    if (!postId || !reason || !ownerPhoto || !npmPhoto) {
+    if (!postId || !reason) {
       logger.warn("POST /api/claims — missing required fields")
       return res.status(400).json({ error: "Missing required fields" })
     }
@@ -26,8 +26,6 @@ router.post("/", authMiddleware, async (req, res) => {
       postId,
       userId: req.user.userId,
       reason,
-      ownerPhoto,
-      npmPhoto,
     })
 
     await claim.save()

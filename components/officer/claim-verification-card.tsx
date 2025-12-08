@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast"
 import { formatDateTime } from "@/lib/formatDate"
 import { Button } from "@/components/ui/button"
 import VerificationModal from "@/components/officer/verification-modal"
-import { CheckCircle2, Clock, XCircle, MessageCircle, AlertCircle } from "lucide-react"
+import { CheckCircle2, Clock, XCircle, MessageCircle } from "lucide-react"
 
 interface Claim {
   _id: string
@@ -22,8 +22,7 @@ interface Claim {
     profileImage?: string
   }
   reason: string
-  ownerPhoto: string
-  npmPhoto: string
+  evidencePhoto: string
   status: "pending" | "approved" | "rejected"
   createdAt: string
 }
@@ -106,19 +105,11 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             {/* Left: Photos */}
             <div className="space-y-4">
-              <h4 className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Bukti Foto</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="group relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 cursor-pointer">
-                  <img src={claim.ownerPhoto || "/placeholder.svg"} alt="Bukti 1" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white text-xs font-semibold">Foto Barang</span>
-                  </div>
-                </div>
-                <div className="group relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 cursor-pointer">
-                  <img src={claim.npmPhoto || "/placeholder.svg"} alt="Bukti 2" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white text-xs font-semibold">KTM/Identitas</span>
-                  </div>
+              <h4 className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Foto Barang</h4>
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-100 cursor-pointer group">
+                <img src={(claim.postId && claim.postId.image) || "/placeholder.svg"} alt="Foto Barang" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-white text-xs font-semibold">Foto Barang</span>
                 </div>
               </div>
             </div>
@@ -153,7 +144,6 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
 
           {/* Action Footer */}
           <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-50">
-            {/* Chat Button */}
             {/* Chat/Comment Button */}
             <Button
               variant="ghost"

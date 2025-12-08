@@ -63,6 +63,8 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
     return () => setIsMounted(false)
   }, [])
 
+
+
   const handleClaim = async () => {
     if (!claimReason.trim()) {
       toast({
@@ -72,6 +74,8 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
       })
       return
     }
+
+
 
     setLoading(true)
     try {
@@ -84,8 +88,6 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
         body: JSON.stringify({
           postId: post._id,
           reason: claimReason,
-          ownerPhoto: "https://via.placeholder.com/300",
-          npmPhoto: "https://via.placeholder.com/300",
         }),
       })
 
@@ -271,9 +273,11 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
                         className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 outline-none resize-none text-sm h-32"
                       />
 
+
+
                       <div className="bg-blue-50 text-blue-700 text-xs p-3 rounded-lg flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>Officer akan meminta bukti tambahan (Foto KTM + Foto diri dengan barang) setelah pengajuan ini.</span>
+                        <span>Officer akan memverifikasi klaim Anda berdasarkan deskripsi dan foto bukti yang dilampirkan.</span>
                       </div>
 
                       <Button

@@ -32,173 +32,208 @@ router.post("/", authMiddleware, async (req, res) => {
     try {
       const useGemini = (process.env.MATCH_USE_GEMINI || "false").toString().toLowerCase() === "true" && geminiClient.isGeminiAvailable()
       if (useGemini) {
-        const emb = await geminiClient.embedText(`${post.itemName} \n ${post.description}`)
+        let textToEmbed = `${post.itemName} \n ${post.description}`
+
+        // Enrich with image description if image is present
+        if (post.image) {
+          try {
+            const imageDesc = await geminiClient.describeImage(post.image)
+            if (imageDesc) {
+              textToEmbed += `\n[Image Visual Context]: ${imageDesc}`
+              // Optionally append to internal post description or just use for embedding?
+              // For now, only using it for embedding to keep user description clean.
+            }
+          } catch (imgErr) {
+            logger.warn(`Failed to describe image for post ${post._id}: ${imgErr.message}`)
+          }
+        }
+
+        const emb = await geminiClient.embedText(textToEmbed)
         if (emb && emb.length) {
           post.embedding = Array.from(emb)
           await post.save()
-          logger.info(`Cached embedding for post ${post._id}`)
+          logger.info(`Cached embedding for post ${post._id} (with image context)`)
         }
       }
     } catch (e) {
       logger.warn(`Failed to cache embedding for new post ${post._id}: ${e.message}`)
     }
     logger.info(`Post created successfully: ${post._id}`)
-    // After creating a post, run a lightweight matching routine to find possible matches
-    // between lost and found posts. This is a simple heuristic-based matcher (no external AI).
-    ;(async function runMatching(newPost) {
-      try {
-    logger.info(`Running matcher for post ${newPost._id} - "${newPost.itemName}" (type=${newPost.type})`)
-    const includeSelf = (process.env.MATCH_INCLUDE_SELF || "false").toString().toLowerCase() === "true"
-    logger.info(`Matcher includeSelf=${includeSelf}`)
-    const useGemini = (process.env.MATCH_USE_GEMINI || "false").toString().toLowerCase() === "true" && geminiClient.isGeminiAvailable()
-    if (useGemini) logger.info("Matcher: GEMINI semantic embeddings enabled")
-        // helper: normalize and tokenise text
-        const normalize = (s = "") =>
-          s
-            .toString()
-            .toLowerCase()
-            .replace(/[\W_]+/g, " ")
-            .split(/\s+/)
-            .filter(Boolean)
+      // After creating a post, run a lightweight matching routine to find possible matches
+      // between lost and found posts. This is a simple heuristic-based matcher (no external AI).
+      ; (async function runMatching(newPost) {
+        try {
+          logger.info(`Running matcher for post ${newPost._id} - "${newPost.itemName}" (type=${newPost.type})`)
+          const includeSelf = (process.env.MATCH_INCLUDE_SELF || "false").toString().toLowerCase() === "true"
+          logger.info(`Matcher includeSelf=${includeSelf}`)
+          const useGemini = (process.env.MATCH_USE_GEMINI || "false").toString().toLowerCase() === "true" && geminiClient.isGeminiAvailable()
+          if (useGemini) logger.info("Matcher: GEMINI semantic embeddings enabled")
+          // helper: normalize and tokenise text
+          const normalize = (s = "") =>
+            s
+              .toString()
+              .toLowerCase()
+              .replace(/[\W_]+/g, " ")
+              .split(/\s+/)
+              .filter(Boolean)
 
-        const jaccard = (aTokens, bTokens) => {
-          const a = new Set(aTokens)
-          const b = new Set(bTokens)
-          const inter = new Set([...a].filter((x) => b.has(x)))
-          const union = new Set([...a, ...b])
-          return union.size === 0 ? 0 : inter.size / union.size
-        }
-
-        const oppositeType = newPost.type === "lost" ? "found" : "lost"
-
-        // Search candidates within same faculty and active status for performance
-        const candidates = await Post.find({
-          _id: { $ne: newPost._id },
-          status: "active",
-          type: oppositeType,
-          faculty: newPost.faculty,
-        })
-        logger.info(`Matcher: found ${candidates.length} candidates to compare`) 
-
-        const newNameTokens = normalize(newPost.itemName)
-        const newDescTokens = normalize(newPost.description)
-
-        const matches = []
-
-        // If Gemini allowed, request embedding for the new post once
-        let newEmb = null
-        if (useGemini) {
-          try {
-            newEmb = await geminiClient.embedText(`${newPost.itemName} \n ${newPost.description}`)
-            if (newEmb) logger.info(`Matcher: obtained embedding for new post (${newPost._id}) len=${newEmb.length}`)
-          } catch (e) {
-            logger.warn(`Matcher: failed to get embedding for new post ${newPost._id}: ${e.message}`)
-            newEmb = null
+          const jaccard = (aTokens, bTokens) => {
+            const a = new Set(aTokens)
+            const b = new Set(bTokens)
+            const inter = new Set([...a].filter((x) => b.has(x)))
+            const union = new Set([...a, ...b])
+            return union.size === 0 ? 0 : inter.size / union.size
           }
-        }
 
-        for (const cand of candidates) {
-          // skip same user unless configured to include self-matches
-          if (!includeSelf) {
-            try {
-              if (cand.userId.toString() === newPost.userId.toString()) {
-                logger.info(`Matcher: skipping candidate ${cand._id} because it's from the same user (${cand.userId})`)
+          const oppositeType = newPost.type === "lost" ? "found" : "lost"
+
+          // Search candidates within same faculty and active status for performance
+          const candidates = await Post.find({
+            _id: { $ne: newPost._id },
+            status: "active",
+            type: oppositeType,
+            faculty: newPost.faculty,
+          })
+          logger.info(`Matcher: found ${candidates.length} candidates to compare`)
+
+          const newNameTokens = normalize(newPost.itemName)
+          const newDescTokens = normalize(newPost.description)
+
+          const matches = []
+
+          // If Gemini allowed, request embedding for the new post once
+          // If Gemini allowed, use cached embedding or generate new enriched one
+          let newEmb = null
+          if (useGemini) {
+            // Priority 1: Use the embedding we just saved (which includes image context)
+            if (newPost.embedding && newPost.embedding.length > 0) {
+              newEmb = new Float32Array(newPost.embedding)
+              logger.info(`Matcher: used cached embedding for new post (${newPost._id})`)
+            } else {
+              // Priority 2: Generate fresh (fallback)
+              try {
+                let textToEmbed = `${newPost.itemName} \n ${newPost.description}`
+                if (newPost.image) {
+                  const imgDesc = await geminiClient.describeImage(newPost.image)
+                  if (imgDesc) textToEmbed += `\n[Image Visual Context]: ${imgDesc}`
+                }
+                newEmb = await geminiClient.embedText(textToEmbed)
+              } catch (e) {
+                logger.warn(`Matcher: failed to get embedding for new post ${newPost._id}: ${e.message}`)
+              }
+            }
+          }
+
+          for (const cand of candidates) {
+            // skip same user unless configured to include self-matches
+            if (!includeSelf) {
+              try {
+                if (cand.userId.toString() === newPost.userId.toString()) {
+                  logger.info(`Matcher: skipping candidate ${cand._id} because it's from the same user (${cand.userId})`)
+                  continue
+                }
+              } catch (e) {
+                logger.warn(`Matcher: could not compare userId for candidate ${cand._id}: ${e.message}`)
                 continue
               }
-            } catch (e) {
-              // defensive: if cand.userId isn't an object with toString, log and continue
-              logger.warn(`Matcher: could not compare userId for candidate ${cand._id}: ${e.message}`)
-              continue
             }
-          }
 
-          const candNameTokens = normalize(cand.itemName)
-          const candDescTokens = normalize(cand.description)
+            const candNameTokens = normalize(cand.itemName)
+            const candDescTokens = normalize(cand.description)
 
-          // name similarity and description similarity
-          const nameSim = jaccard(newNameTokens, candNameTokens)
-          const descSim = jaccard(newDescTokens, candDescTokens)
+            // name similarity and description similarity
+            const nameSim = jaccard(newNameTokens, candNameTokens)
+            const descSim = jaccard(newDescTokens, candDescTokens)
 
-          // small boost if category or location matches
-          let heuristicScore = Math.max(nameSim, descSim) // primary
-          if (cand.category === newPost.category) heuristicScore += 0.15
-          if (cand.location && newPost.location && cand.location.toLowerCase() === newPost.location.toLowerCase()) heuristicScore += 0.1
-          heuristicScore = Math.min(heuristicScore, 1)
+            // small boost if category or location matches
+            let heuristicScore = Math.max(nameSim, descSim) // primary
+            if (cand.category === newPost.category) heuristicScore += 0.15
+            if (cand.location && newPost.location && cand.location.toLowerCase() === newPost.location.toLowerCase()) heuristicScore += 0.1
+            heuristicScore = Math.min(heuristicScore, 1)
 
-          // Try semantic embedding similarity when available
-          let embeddingScore = null
-          if (newEmb) {
-            try {
-              const candEmb = await geminiClient.embedText(`${cand.itemName} \n ${cand.description}`)
-                  if (candEmb && candEmb.length === newEmb.length) {
-                    embeddingScore = geminiClient.cosineSimilarity(newEmb, candEmb)
-                    logger.info(`Matcher embedding sim: cand=${cand._id} embSim=${embeddingScore.toFixed(3)}`)
-                    // cache candidate embedding if not present
-                    try {
-                      if (!cand.embedding || cand.embedding.length !== candEmb.length) {
-                        cand.embedding = Array.from(candEmb)
-                        await cand.save()
-                        logger.info(`Cached embedding for candidate ${cand._id}`)
-                      }
-                    } catch (saveErr) {
-                      logger.warn(`Failed to cache embedding for candidate ${cand._id}: ${saveErr.message}`)
-                    }
-                  } else if (candEmb) {
-                    logger.warn(`Matcher: embedding length mismatch for cand ${cand._id}`)
+            // Try semantic embedding similarity when available
+            let embeddingScore = null
+            if (newEmb) {
+              try {
+                let candEmb = null
+                // 1. Try cached
+                if (cand.embedding && cand.embedding.length > 0) {
+                  candEmb = new Float32Array(cand.embedding)
+                }
+                // 2. Generate if missing
+                if (!candEmb) {
+                  let candText = `${cand.itemName} \n ${cand.description}`
+                  if (cand.image) {
+                    const cImgDesc = await geminiClient.describeImage(cand.image)
+                    if (cImgDesc) candText += `\n[Image Visual Context]: ${cImgDesc}`
                   }
-            } catch (e) {
-              logger.warn(`Matcher: failed to get embedding for candidate ${cand._id}: ${e.message}`)
+                  candEmb = await geminiClient.embedText(candText)
+
+                  // Cache it
+                  if (candEmb && candEmb.length > 0) {
+                    cand.embedding = Array.from(candEmb)
+                    await cand.save()
+                    logger.info(`Matcher: Generated and cached embedding for candidate ${cand._id}`)
+                  }
+                }
+
+                if (candEmb && candEmb.length === newEmb.length) {
+                  embeddingScore = geminiClient.cosineSimilarity(newEmb, candEmb)
+                  logger.info(`Matcher embedding sim: cand=${cand._id} embSim=${embeddingScore.toFixed(3)}`)
+                }
+              } catch (e) {
+                logger.warn(`Matcher: failed to comparison for candidate ${cand._id}: ${e.message}`)
+              }
+            }
+
+            // Final score: if embedding available, prefer it (weighted) otherwise heuristic
+            // Weighting: embedding 0.8, heuristic 0.2
+            let score = heuristicScore
+            if (embeddingScore !== null) {
+              score = Math.max(heuristicScore, embeddingScore * 0.95) // keep a conservative mapping: favor embedding but preserve heuristic bumps
+            }
+
+            // threshold — prefer higher threshold for embeddings
+            const defaultThreshold = embeddingScore !== null ? parseFloat(process.env.MATCH_SIMILARITY_THRESHOLD || "0.75") : parseFloat(process.env.MATCH_SIMILARITY_THRESHOLD || "0.25")
+            logger.info(`Matcher compare: cand=${cand._id} nameSim=${nameSim.toFixed(2)} descSim=${descSim.toFixed(2)} heuristic=${heuristicScore.toFixed(2)} finalScore=${score.toFixed(2)} threshold=${defaultThreshold}`)
+            if (score >= defaultThreshold) {
+              matches.push({ cand, score })
             }
           }
 
-          // Final score: if embedding available, prefer it (weighted) otherwise heuristic
-          // Weighting: embedding 0.8, heuristic 0.2
-          let score = heuristicScore
-          if (embeddingScore !== null) {
-            score = Math.max(heuristicScore, embeddingScore * 0.95) // keep a conservative mapping: favor embedding but preserve heuristic bumps
+          if (matches.length > 0) {
+            logger.info(`Found ${matches.length} match(es) for post ${newPost._id}`)
           }
 
-          // threshold — prefer higher threshold for embeddings
-          const defaultThreshold = embeddingScore !== null ? parseFloat(process.env.MATCH_SIMILARITY_THRESHOLD || "0.75") : parseFloat(process.env.MATCH_SIMILARITY_THRESHOLD || "0.25")
-          logger.info(`Matcher compare: cand=${cand._id} nameSim=${nameSim.toFixed(2)} descSim=${descSim.toFixed(2)} heuristic=${heuristicScore.toFixed(2)} finalScore=${score.toFixed(2)} threshold=${defaultThreshold}`)
-          if (score >= defaultThreshold) {
-            matches.push({ cand, score })
+          // create notifications for each match: notify the owner of the existing candidate
+          // and notify the author of the new post about the existing candidate
+          for (const { cand, score } of matches) {
+            try {
+              const messageForCandidate = `Kemungkinan kecocokan ditemukan untuk posting Anda \"${cand.itemName}\" — Lihat detail: \"${newPost.itemName}\".`
+              const notif1 = new Notification({
+                userId: cand.userId,
+                type: "match_found",
+                message: messageForCandidate,
+                postId: newPost._id,
+              })
+              await notif1.save()
+
+              const messageForNewAuthor = `Kami menemukan posting yang mungkin cocok dengan laporan Anda \"${newPost.itemName}\" — lihat posting lain: \"${cand.itemName}\" (score=${score.toFixed(2)}).`
+              const notif2 = new Notification({
+                userId: newPost.userId,
+                type: "match_found",
+                message: messageForNewAuthor,
+                postId: cand._id,
+              })
+              await notif2.save()
+            } catch (notifErr) {
+              logger.error(`Failed to create match notification: ${notifErr.message}`)
+            }
           }
+        } catch (matchErr) {
+          logger.error(`Error during post matching: ${matchErr.message}`)
         }
-
-        if (matches.length > 0) {
-          logger.info(`Found ${matches.length} match(es) for post ${newPost._id}`)
-        }
-
-        // create notifications for each match: notify the owner of the existing candidate
-        // and notify the author of the new post about the existing candidate
-        for (const { cand, score } of matches) {
-          try {
-            const messageForCandidate = `Kemungkinan kecocokan ditemukan untuk posting Anda \"${cand.itemName}\" — Lihat detail: \"${newPost.itemName}\".`
-            const notif1 = new Notification({
-              userId: cand.userId,
-              type: "match_found",
-              message: messageForCandidate,
-              postId: newPost._id,
-            })
-            await notif1.save()
-
-            const messageForNewAuthor = `Kami menemukan posting yang mungkin cocok dengan laporan Anda \"${newPost.itemName}\" — lihat posting lain: \"${cand.itemName}\" (score=${score.toFixed(2)}).`
-            const notif2 = new Notification({
-              userId: newPost.userId,
-              type: "match_found",
-              message: messageForNewAuthor,
-              postId: cand._id,
-            })
-            await notif2.save()
-          } catch (notifErr) {
-            logger.error(`Failed to create match notification: ${notifErr.message}`)
-          }
-        }
-      } catch (matchErr) {
-        logger.error(`Error during post matching: ${matchErr.message}`)
-      }
-    })(post).catch((e) => logger.error(`Matcher invocation error: ${e.message}`))
+      })(post).catch((e) => logger.error(`Matcher invocation error: ${e.message}`))
     res.status(201).json(post)
   } catch (err) {
     logger.error(`Error in POST /api/posts — ${err.message}`)

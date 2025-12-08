@@ -6,7 +6,7 @@ import logger from './logger.js'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GEMINI_GEN_MODEL = process.env.GEMINI_GEN_MODEL || 'gemini-2.5-flash'
-const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'textembedding-gecko-001'
+const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'text-embedding-004'
 
 // Initialize SDK client eagerly (required dependency)
 let ai = null
@@ -30,74 +30,137 @@ export async function embedText(text) {
     return null
   }
 
-  // Use SDK embedding if available
-  if (ai && ai.embeddings && typeof ai.embeddings.create === 'function') {
+  // LOGGING INPUT (Truncated if too long)
+  const previewText = text.length > 100 ? text.substring(0, 100) + '...' : text
+  logger.info(`[GEMINI DEBUG] Generating embedding for: "${previewText}"`)
+
+  // SDK Attempt
+  if (ai && ai.models && typeof ai.models.embedContent === 'function') {
     try {
-      const resp = await ai.embeddings.create({ model: GEMINI_EMBED_MODEL, input: text })
-      logger.info(`gemini.embedText (sdk) response: ${JSON.stringify(resp).slice(0, 2000)}`)
-      const emb = resp?.data?.[0]?.embedding || resp?.embedding || null
-      if (!emb || !Array.isArray(emb)) {
-        logger.warn('embedText: embedding missing in SDK response')
-        return null
+      // For @google/genai, models.embedContent takes { model, content }
+      const resp = await ai.models.embedContent({
+        model: GEMINI_EMBED_MODEL,
+        content: { parts: [{ text }] }
+      })
+      // Extract embedding from response
+      const emb = resp?.embedding?.values || resp?.embedding || null
+
+      if (emb && Array.isArray(emb)) {
+        logger.info(`[GEMINI DEBUG] SDK embedding success. Length: ${emb.length}, First 3 values: [${emb.slice(0, 3).join(', ')}...]`)
+        return new Float32Array(emb.map((v) => Number(v)))
       }
-      return new Float32Array(emb.map((v) => Number(v)))
+      logger.warn('embedText: SDK response missing embedding')
+      // Try to log the raw response structure for debugging if it failed
+      try { logger.info(`gemini.embedText (sdk) raw failure: ${JSON.stringify(resp).slice(0, 500)}`) } catch (_) { }
+
     } catch (err) {
-      logger.error('embedText SDK error: ' + (err?.message || err))
-      try { logger.info('embedText SDK error detail: ' + JSON.stringify(err)) } catch (_) {}
-      // fall through to HTTP fallback
+      // SDK failed, but we have a fallback. Log as warning only.
+      logger.warn('embedText SDK attempt failed (using fallback): ' + (err?.message || err))
     }
-  } else {
-    logger.warn('embedText: SDK client or embeddings.create not available — falling back to HTTP REST call')
   }
 
-  // HTTP fallback to Google Generative Language embeddings endpoint
+  // HTTP Fallback to Google Generative Language embeddings endpoint
+  // Docs: https://ai.google.dev/api/embeddings#method:-models.embedcontent
   try {
     const host = process.env.GEMINI_API_HOST || 'https://generativelanguage.googleapis.com'
-    const versions = ['v1', 'v1beta']
+    const versions = ['v1beta', 'v1']
     const modelCandidates = Array.from(new Set([
       GEMINI_EMBED_MODEL,
       process.env.GEMINI_EMBED_MODEL_ALT,
-      'textembedding-gecko-001',
-      'embed-text-v1',
+      'text-embedding-004',
+      'textembedding-gecko-001', // Keep gecko for backward compat
     ].filter(Boolean)))
 
     for (const version of versions) {
       for (const model of modelCandidates) {
-        const url = `${host}/${version}/models/${encodeURIComponent(model)}:embed?key=${encodeURIComponent(GEMINI_API_KEY)}`
+        // Use :embedContent which is the standard for modern Gemini models
+        const url = `${host}/${version}/models/${encodeURIComponent(model)}:embedContent?key=${encodeURIComponent(GEMINI_API_KEY)}`
+
         try {
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input: text }),
+            body: JSON.stringify({
+              model: `models/${model}`,
+              content: { parts: [{ text }] }
+            }),
           })
-          const txt = await res.text()
-          try { logger.info(`gemini.embedText (http) attempt version=${version} model=${model} status=${res.status} body=${txt.slice(0,2000)}`) } catch (_) {}
+
           if (!res.ok) {
-            logger.warn(`embedText HTTP attempt failed for model=${model} version=${version}: ${res.status} ${res.statusText}`)
-            // continue trying other model/version combos
+            // Only log warning if it's the PRIMARY model failing
+            if (model === GEMINI_EMBED_MODEL) {
+              const txt = await res.text()
+              logger.warn(`embedText HTTP failed (${version}/${model}): ${res.status} ${txt.slice(0, 100)}`)
+            }
             continue
           }
-          const data = JSON.parse(txt)
-          const emb = data?.data?.[0]?.embedding || data?.embedding || null
-          if (!emb || !Array.isArray(emb)) {
-            logger.warn(`embedText: embedding missing in HTTP response for model=${model} version=${version}`)
-            continue
+
+          const data = await res.json()
+          const emb = data?.embedding?.values || data?.embedding || null
+
+          if (emb && Array.isArray(emb)) {
+            logger.info(`[GEMINI DEBUG] HTTP fallback embedding success via ${model}. Length: ${emb.length}`)
+            return new Float32Array(emb.map((v) => Number(v)))
           }
-          return new Float32Array(emb.map((v) => Number(v)))
         } catch (err) {
-          logger.warn(`embedText HTTP attempt error for model=${model} version=${version}: ${err?.message || err}`)
-          // try next
+          /* ignore network errors on fallback candidates */
         }
       }
     }
 
-    logger.warn('embedText HTTP fallback: all attempts failed (404/invalid model or API key may be restricted)')
+    logger.warn('embedText HTTP fallback: all attempts failed')
     return null
   } catch (err) {
-    logger.error('embedText HTTP fallback error: ' + (err?.message || err))
-    try { logger.info('embedText HTTP error detail: ' + JSON.stringify(err)) } catch (_) {}
+    logger.error('embedText HTTP fallback fatal error: ' + (err?.message || err))
     return null
   }
+}
+
+export async function describeImage(base64Image) {
+  if (!GEMINI_API_KEY) return null
+  if (!base64Image) return null
+
+  // Clean base64 string if it has prefix (data:image/jpeg;base64,...)
+  const match = base64Image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/)
+  let mimeType = 'image/jpeg'
+  let data = base64Image
+
+  if (match) {
+    mimeType = match[1]
+    data = match[2]
+  }
+
+  logger.info(`[GEMINI DEBUG] Describing image (mime: ${mimeType}, size: ${data.length} chars)`)
+
+  // Use SDK if available
+  if (ai && ai.models && typeof ai.models.generateContent === 'function') {
+    try {
+      const prompt = "Describe this lost/found item in detail in 1 paragraph. Focus on visual features like color, brand, condition, and distinct markings."
+      const resp = await ai.models.generateContent({
+        model: GEMINI_GEN_MODEL,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType, data } }
+            ]
+          }
+        ]
+      })
+
+      const text = resp?.response?.text ? resp.response.text() : (resp?.text || null)
+      if (text) {
+        logger.info(`[GEMINI DEBUG] Image Description: ${text.slice(0, 100)}...`)
+        return text
+      }
+    } catch (err) {
+      logger.warn(`describeImage SDK failed: ${err.message}`)
+    }
+  }
+
+  // Fallback to HTTP if needed (omitted for brevity as SDK is working for generateContent usually)
+  return null
 }
 
 export async function generateChat(messagesOrText) {
@@ -109,6 +172,13 @@ export async function generateChat(messagesOrText) {
     logger.warn('generateChat: SDK client or models.generateContent not available')
     return null
   }
+
+  // LOGGING INPUT
+  let debugInput = ''
+  if (typeof messagesOrText === 'string') debugInput = messagesOrText
+  else if (Array.isArray(messagesOrText)) debugInput = JSON.stringify(messagesOrText)
+
+  logger.info(`[GEMINI DEBUG] Chat Generate Input: ${debugInput.slice(0, 200)}...`)
 
   try {
     let resp
@@ -122,17 +192,19 @@ export async function generateChat(messagesOrText) {
       return null
     }
 
-    // Debug log (truncate to avoid huge logs)
-    try { logger.info(`gemini.generateChat response: ${JSON.stringify(resp).slice(0, 2000)}`) } catch (e) {}
+    // output extraction
+    let outputText = ''
+    if (typeof resp?.text === 'string') outputText = resp.text
+    else if (typeof resp?.outputText === 'string') outputText = resp.outputText
+    else if (Array.isArray(resp?.candidates) && resp.candidates[0]?.outputText) outputText = resp.candidates[0].outputText
+    else outputText = JSON.stringify(resp)
 
-    if (typeof resp?.text === 'string') return resp.text
-    if (typeof resp?.outputText === 'string') return resp.outputText
-    if (Array.isArray(resp?.candidates) && resp.candidates[0]?.outputText) return resp.candidates[0].outputText
-    // fallback: stringify
-    return JSON.stringify(resp)
+    logger.info(`[GEMINI DEBUG] Chat Generate Output: ${outputText.slice(0, 200)}...`)
+
+    return outputText
   } catch (err) {
     logger.error('generateChat error: ' + (err?.message || err))
-    try { logger.info('generateChat error detail: ' + JSON.stringify(err)) } catch (_) {}
+    try { logger.info('generateChat error detail: ' + JSON.stringify(err)) } catch (_) { }
     return null
   }
 }

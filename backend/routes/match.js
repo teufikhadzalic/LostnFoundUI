@@ -24,6 +24,10 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
       return union.size === 0 ? 0 : inter.size / union.size
     }
 
+    // small helper to simulate thinking delay for AI responses
+    const sleep = (ms) => new Promise((res) => setTimeout(res, ms))
+    const randomDelay = (min = 600, max = 1200) => Math.floor(Math.random() * (max - min + 1)) + min
+
     const oppositeType = post.type === "lost" ? "found" : "lost"
     const candidates = await Post.find({ _id: { $ne: post._id }, status: "active", type: oppositeType, faculty: post.faculty })
     logger.info(`Manual matcher: found ${candidates.length} candidates for post ${post._id}`)
@@ -31,9 +35,9 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
     const newNameTokens = normalize(post.itemName)
     const newDescTokens = normalize(post.description)
 
-  const matches = []
-  const heuristicMatches = []
-  const aiMatches = []
+    const matches = []
+    const heuristicMatches = []
+    const aiMatches = []
 
     // Try to get embedding for the new post — prefer cached embedding on the Post document
     let newEmb = null
@@ -47,9 +51,14 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
           newEmb = new Float32Array(post.embedding)
           logger.info(`Manual matcher: using cached embedding for post ${post._id}`)
         } else {
-          // Try to get embedding via geminiClient (SDK) if available. If the client isn't available but we have an
-          // API key, geminiClient will attempt to dynamically import the official SDK; otherwise this call may return null.
-          const got = await geminiClient.embedText(`${post.itemName}\n${post.description}`)
+          // Try to get embedding via geminiClient (SDK) if available.
+          let textToEmbed = `${post.itemName}\n${post.description}`
+          if (post.image) {
+            const imgDesc = await geminiClient.describeImage(post.image)
+            if (imgDesc) textToEmbed += `\n[Image Visual Context]: ${imgDesc}`
+          }
+
+          const got = await geminiClient.embedText(textToEmbed)
           if (got) {
             newEmb = got
             try {
@@ -94,13 +103,19 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
         try {
           // Prefer cached candidate embedding if present
           let candEmb = null
-          if (cand.embedding && Array.isArray(cand.embedding) && cand.embedding.length === newEmb.length) {
+          if (cand.embedding && Array.isArray(cand.embedding) && cand.embedding.length > 0) {
             candEmb = new Float32Array(cand.embedding)
           } else {
             // request embedding from provider
             try {
-              const got = await geminiClient.embedText(`${cand.itemName}\n${cand.description}`)
-              if (got && got.length === newEmb.length) {
+              let candText = `${cand.itemName}\n${cand.description}`
+              if (cand.image) {
+                const cImgDesc = await geminiClient.describeImage(cand.image)
+                if (cImgDesc) candText += `\n[Image Visual Context]: ${cImgDesc}`
+              }
+
+              const got = await geminiClient.embedText(candText)
+              if (got) {
                 candEmb = got
                 // cache candidate embedding
                 try {
@@ -125,6 +140,12 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
         try {
           const prompt = `Rate the semantic similarity between two lost-and-found items on a scale from 0.0 (completely different) to 1.0 (identical).\nReturn only a JSON object like {"score": 0.87}.\n\nItem A:\nName: ${post.itemName || ''}\nDescription: ${post.description || ''}\nCategory: ${post.category || ''}\nLocation: ${post.location || ''}\n\nItem B:\nName: ${cand.itemName || ''}\nDescription: ${cand.description || ''}\nCategory: ${cand.category || ''}\nLocation: ${cand.location || ''}`
           const resp = await geminiClient.generateChat(prompt)
+          // add a small randomized delay so the UI feels like the model is "thinking"
+          try {
+            await sleep(randomDelay())
+          } catch (e) {
+            /* ignore */
+          }
           if (resp) {
             let parsed = null
             try {
@@ -173,7 +194,7 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
       }
     }
 
-  const useGemini = process.env.MATCH_USE_GEMINI === "true" && geminiClient.isGeminiAvailable()
+    const useGemini = process.env.MATCH_USE_GEMINI === "true" && geminiClient.isGeminiAvailable()
     // prepare response lists
     const combined = matches.map((m) => ({ id: m.cand._id, score: m.score }))
     return res.json({

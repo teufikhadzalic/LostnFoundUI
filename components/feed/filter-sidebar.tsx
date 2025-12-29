@@ -29,6 +29,7 @@ interface FilterState {
     faculty: string // comma separate
     category: string
     type: string
+    status: string
 }
 
 interface Props {
@@ -40,8 +41,10 @@ export default function FilterSidebar({ filters, onFilterChange }: Props) {
     const selectedFaculties = filters.faculty ? filters.faculty.split(",") : []
     const selectedCategories = filters.category ? filters.category.split(",") : []
     const selectedTypes = filters.type ? filters.type.split(",") : []
+    const selectedStatus = filters.status ? filters.status.split(",") : []
 
     const [openSections, setOpenSections] = useState({
+        status: true,
         type: true,
         faculty: true,
         category: true,
@@ -62,6 +65,11 @@ export default function FilterSidebar({ filters, onFilterChange }: Props) {
     const handleTypeChange = (val: string) => {
         const newList = toggleItem(selectedTypes, val)
         onFilterChange("type", newList.join(","))
+    }
+
+    const handleStatusChange = (val: string) => {
+        const newList = toggleItem(selectedStatus, val)
+        onFilterChange("status", newList.join(","))
     }
 
     const handleFacultyChange = (val: string) => {
@@ -94,6 +102,7 @@ export default function FilterSidebar({ filters, onFilterChange }: Props) {
                             onFilterChange("faculty", "")
                             onFilterChange("category", "")
                             onFilterChange("type", "")
+                            onFilterChange("status", "")
                         }}
                     >
                         <FilterX className="w-3.5 h-3.5 mr-1" />
@@ -101,6 +110,34 @@ export default function FilterSidebar({ filters, onFilterChange }: Props) {
                     </Button>
                 )}
             </div>
+
+            {/* Status Section */}
+            <div className="group">
+                <button
+                    onClick={() => toggleSection("status")}
+                    className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50 transition-colors mb-2"
+                >
+                    <span className="font-bold text-gray-800 text-sm uppercase tracking-wide">Status Barang</span>
+                    {openSections.status ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </button>
+                {openSections.status && (
+                    <div className="space-y-1 pl-2">
+                        {[{ value: "active", label: "Masih Tersedia" }, { value: "claimed", label: "Sedang Diklaim" }].map((option) => (
+                            <label key={option.value} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group/item">
+                                <Checkbox
+                                    checked={selectedStatus.includes(option.value)}
+                                    onCheckedChange={() => handleStatusChange(option.value)}
+                                    className="data-[state=checked]:bg-yellow-400 data-[state=checked]:border-yellow-400"
+                                />
+                                <span className={`text-sm ${selectedStatus.includes(option.value) ? 'font-semibold text-gray-900' : 'text-gray-600 group-hover/item:text-gray-900'}`}>{option.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* separator */}
+            <div className="h-px bg-gray-100 w-full" />
 
             {/* Type Section */}
             <div className="group">

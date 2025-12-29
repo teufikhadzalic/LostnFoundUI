@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import ClaimVerificationCard from "@/components/officer/claim-verification-card"
+import PostDetailModal from "@/components/feed/post-detail-modal"
 
 interface Claim {
   _id: string
@@ -20,8 +21,7 @@ interface Claim {
     profileImage?: string
   }
   reason: string
-  ownerPhoto: string
-  npmPhoto: string
+  evidencePhoto: string
   status: "pending" | "approved" | "rejected"
   createdAt: string
 }
@@ -31,6 +31,7 @@ export default function OfficerPage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending")
+  const [selectedPost, setSelectedPost] = useState<any>(null)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -137,6 +138,22 @@ export default function OfficerPage() {
     }
   }
 
+  const handleViewPost = async (postId: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts/${postId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSelectedPost(data)
+      } else {
+        toast({ variant: "destructive", description: "Gagal memuat detail post" })
+      }
+    } catch (err) {
+      toast({ variant: "destructive", description: "Terjadi kesalahan saat memuat post" })
+    }
+  }
+
   // Updated filter logic
   const filteredClaims = filter === "all" ? claims : claims.filter((c) => c.status === filter)
 
@@ -223,10 +240,19 @@ export default function OfficerPage() {
                 setClaims((prev) => prev.map((c) => (c._id === claim._id ? { ...c, status } : c)))
                 fetchClaims()
               }}
+              onViewPost={handleViewPost}
             />
           ))
         )}
       </div>
+
+      {selectedPost && (
+        <PostDetailModal
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onPostUpdated={fetchClaims}
+        />
+      )}
     </div>
   )
 }

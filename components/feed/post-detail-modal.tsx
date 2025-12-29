@@ -44,6 +44,8 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
   const { toast } = useToast()
   const [isOwner, setIsOwner] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [matchResults, setMatchResults] = useState<any>(null)
+  const [loadingMatch, setLoadingMatch] = useState(false)
 
   useEffect(() => {
     try {
@@ -56,12 +58,57 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
     } catch (e) {
       setIsOwner(false)
     }
+    // Reset match results when post changes
+    setMatchResults(null)
   }, [post])
 
   useEffect(() => {
     setIsMounted(true)
     return () => setIsMounted(false)
   }, [])
+
+  const handleRunMatch = async () => {
+    setLoadingMatch(true)
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/match/post/${post._id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ dryRun: true }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        // The backend returns { combinedMatches: [{ id, score }] }
+        // We need to fetch details for these matches or assume backend returns enough info?
+        // Backend currently returns { cand, score } but mapped to { id, score } in res.json
+        // Wait, match.js line 199: combined = matches.map((m) => ({ id: m.cand._id, score: m.score }))
+        // It DOES NOT return candidate details (name, image).
+        // I should update match.js to return candidate details OR fetch them here.
+        // Let's update match.js first to be efficient, but I already approved updates. 
+        // Let's look at match.js again.
+        // It returns `combinedMatches: matches.map(...)`.
+        // I should update match.js to return full candidate details for UI.
+
+        // For now, let's assume I will update match.js in next step or use what I have.
+        // Actually, to make this work nicely, I need match.js to return `cand` object.
+
+        // But let's finish the frontend function structure first.
+        setMatchResults(data.combinedMatches || [])
+        if (data.matched === 0) {
+          toast({ description: "Belum ada postingan yang mirip ditemukan." })
+        }
+      } else {
+        toast({ variant: "destructive", description: "Gagal menjalankan pencarian AI" })
+      }
+    } catch (e) {
+      toast({ variant: "destructive", description: "Terjadi kesalahan" })
+    } finally {
+      setLoadingMatch(false)
+    }
+  }
 
 
 
@@ -193,27 +240,88 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
             </div>
 
             {/* User Profile Mini */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                {post.userId?.name?.charAt(0) || "?"}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-gray-900">{post.userId?.name || "Unknown"}</p>
-                <p className="text-xs text-gray-500">Pelapor</p>
-              </div>
+            <div className="flex flex-col gap-3">
               {isOwner && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                    onClick={() => handleRunMatch()}
+                    disabled={loadingMatch}
+                  >
+                    {loadingMatch ? "Memproses..." : "🔍 Cek Kecocokan AI"}
+                  </Button>
+                </div>
               )}
+
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                  {post.userId?.name?.charAt(0) || "?"}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-gray-900">{post.userId?.name || "Unknown"}</p>
+                  <p className="text-xs text-gray-500">Pelapor</p>
+                </div>
+                {isOwner && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* AI Match Results */}
+          {matchResults && matchResults.length > 0 && (
+            <div className="bg-indigo-50 border-b border-indigo-100 p-4 animate-in slide-in-from-top-2">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-indigo-900 text-sm flex items-center gap-2">
+                  ✨ Rekomendasi AI ({matchResults.length})
+                </h3>
+                <button
+                  onClick={() => setMatchResults(null)}
+                  className="text-indigo-400 hover:text-indigo-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                {matchResults.map((match: any) => (
+                  <div key={match.id} className="bg-white rounded-lg p-3 border border-indigo-100 flex gap-3 shadow-sm hover:shadow-md transition-shadow">
+                    <img
+                      src={match.cand?.image || "/placeholder.svg"}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover bg-gray-100"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm truncate">{match.cand?.itemName}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${match.score > 0.8 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {(match.score * 100).toFixed(0)}% Match
+                        </span>
+                        <span className="text-xs text-gray-400">• {formatDateTime(match.cand?.createdAt).split(',')[0]}</span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="self-center"
+                      onClick={() => window.open(`/feed?postId=${match.id}`, '_blank')}
+                    >
+                      Lihat
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -250,13 +358,19 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
                       <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-3 text-white shadow-lg shadow-yellow-400/30">
                         <ShieldCheck className="w-6 h-6" />
                       </div>
-                      <h3 className="font-bold text-gray-900 mb-1">Barang ini milik Anda?</h3>
-                      <p className="text-sm text-gray-600 mb-4">Ajukan klaim kepemilikan untuk diverifikasi oleh officer.</p>
+                      <h3 className="font-bold text-gray-900 mb-1">
+                        {post.type === 'lost' ? "Anda menemukan barang ini?" : "Barang ini milik Anda?"}
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        {post.type === 'lost'
+                          ? "Beritahu pemilik bahwa Anda telah menemukannya."
+                          : "Ajukan klaim kepemilikan untuk diverifikasi oleh officer."}
+                      </p>
                       <Button
                         onClick={() => setShowClaimForm(true)}
                         className="w-full bg-gray-900 text-white hover:bg-black rounded-lg h-11 font-bold shadow-lg"
                       >
-                        Ajukan Klaim
+                        {post.type === 'lost' ? "Saya Menemukannya" : "Ajukan Klaim"}
                       </Button>
                     </div>
                   ) : (
@@ -267,7 +381,10 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
                       </div>
 
                       <textarea
-                        placeholder="Jelaskan secara detail kenapa barang ini milik Anda (ciri khusus, isi, dll)..."
+                        placeholder={post.type === 'lost'
+                          ? "Jelaskan kondisi barang yang Anda temukan dan di mana Anda menyimpannya saat ini..."
+                          : "Jelaskan secara detail kenapa barang ini milik Anda (ciri khusus, isi, dll)..."
+                        }
                         value={claimReason}
                         onChange={(e) => setClaimReason(e.target.value)}
                         className="w-full p-3 rounded-lg border-2 border-gray-200 focus:border-yellow-400 focus:ring-0 outline-none resize-none text-sm h-32"
@@ -277,7 +394,11 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
 
                       <div className="bg-blue-50 text-blue-700 text-xs p-3 rounded-lg flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>Officer akan memverifikasi klaim Anda berdasarkan deskripsi dan foto bukti yang dilampirkan.</span>
+                        <span>
+                          {post.type === 'lost'
+                            ? "Officer akan memverifikasi laporan penemuan Anda."
+                            : "Officer akan memverifikasi klaim Anda berdasarkan deskripsi dan foto bukti yang dilampirkan."}
+                        </span>
                       </div>
 
                       <Button

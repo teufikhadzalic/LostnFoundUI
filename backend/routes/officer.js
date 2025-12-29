@@ -73,7 +73,7 @@ router.patch("/:claimId/verify", authMiddleware, officerMiddleware, async (req, 
     await Notification.create({
       userId: claim.userId._id,
       type: notifType,
-      message: `Your claim has been ${status}`,
+      message: `Klaim Anda telah ${status === 'approved' ? 'disetujui' : 'ditolak'}`,
       claimId: claim._id,
     })
 
@@ -88,7 +88,7 @@ router.patch("/:claimId/verify", authMiddleware, officerMiddleware, async (req, 
         await Notification.create({
           userId: claim.userId._id,
           type: "claim_chat",
-          message: "A chat has been created for your claim. Click to open.",
+          message: "Klaim disetujui. Chat privat telah dibuat untuk koordinasi pengambilan barang.",
           claimId: claim._id,
           chatId: chat._id,
           link: `/officer/chat/${chat._id}`,

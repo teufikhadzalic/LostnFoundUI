@@ -182,21 +182,27 @@ router.post("/post/:id", authMiddleware, async (req, res) => {
       }
     }
 
-    // create notifications
-    for (const { cand, score } of matches) {
-      try {
-        const notif1 = new Notification({ userId: cand.userId, type: "match_found", message: `Kemungkinan kecocokan ditemukan untuk posting Anda \"${cand.itemName}\"`, postId: post._id })
-        await notif1.save()
-        const notif2 = new Notification({ userId: post.userId, type: "match_found", message: `Ditemukan posting yang cocok: \"${cand.itemName}\" (score=${score.toFixed(2)})`, postId: cand._id })
-        await notif2.save()
-      } catch (e) {
-        logger.error(`Manual matcher: failed to create notification: ${e.message}`)
+    // create notifications ONLY if not dryRun
+    const dryRun = req.body.dryRun === true || req.query.dryRun === "true"
+
+    if (!dryRun) {
+      for (const { cand, score } of matches) {
+        try {
+          const notif1 = new Notification({ userId: cand.userId, type: "match_found", message: `Kemungkinan kecocokan ditemukan untuk posting Anda \"${cand.itemName}\"`, postId: post._id })
+          await notif1.save()
+          const notif2 = new Notification({ userId: post.userId, type: "match_found", message: `Ditemukan posting yang cocok: \"${cand.itemName}\" (score=${score.toFixed(2)})`, postId: cand._id })
+          await notif2.save()
+        } catch (e) {
+          logger.error(`Manual matcher: failed to create notification: ${e.message}`)
+        }
       }
+    } else {
+      logger.info(`Manual matcher: dryRun enabled, skipped ${matches.length} notifications`)
     }
 
     const useGemini = process.env.MATCH_USE_GEMINI === "true" && geminiClient.isGeminiAvailable()
     // prepare response lists
-    const combined = matches.map((m) => ({ id: m.cand._id, score: m.score }))
+    const combined = matches.map((m) => ({ id: m.cand._id, score: m.score, cand: m.cand }))
     return res.json({
       matched: combined.length,
       mode: useGemini ? "ai" : "heuristic",

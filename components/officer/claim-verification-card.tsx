@@ -30,9 +30,10 @@ interface Claim {
 interface ClaimVerificationCardProps {
   claim: Claim
   onVerify: (status: "approved" | "rejected") => void
+  onViewPost: (postId: string) => void
 }
 
-export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerificationCardProps) {
+export default function ClaimVerificationCard({ claim, onVerify, onViewPost }: ClaimVerificationCardProps) {
   const [showModal, setShowModal] = useState(false)
   const [selectedAction, setSelectedAction] = useState<"approve" | "reject" | null>(null)
   const router = useRouter()
@@ -149,7 +150,7 @@ export default function ClaimVerificationCard({ claim, onVerify }: ClaimVerifica
               variant="ghost"
               onClick={() => {
                 if (claim.postId && claim.postId._id) {
-                  router.push(`/feed?postId=${claim.postId._id}`)
+                  onViewPost(claim.postId._id)
                 } else {
                   toast({ description: "Detail post tidak tersedia", variant: "destructive" })
                 }

@@ -34,6 +34,7 @@ export default function FeedPage() {
     faculty: "",
     category: "",
     type: "",
+    status: "",
     search: "",
   })
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -72,6 +73,7 @@ export default function FeedPage() {
       if (filters.faculty) params.append("faculty", filters.faculty)
       if (filters.category) params.append("category", filters.category)
       if (filters.type) params.append("type", filters.type)
+      if (filters.status) params.append("status", filters.status)
       if (filters.search) params.append("search", filters.search)
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/posts?${params}`, {

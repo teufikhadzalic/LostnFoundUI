@@ -276,8 +276,16 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const { faculty, category, search, type } = req.query
-    const filter = { status: { $in: ["active", "claimed"] } }
+    const { faculty, category, search, type, status } = req.query
+    const filter = {}
+
+    // Status Filter (Default to active + claimed if not specified)
+    if (status) {
+      const statuses = status.split(',').filter(Boolean)
+      if (statuses.length > 0) filter.status = { $in: statuses }
+    } else {
+      filter.status = { $in: ["active", "claimed"] }
+    }
 
     if (faculty) {
       const faculties = faculty.split(',').filter(Boolean)
